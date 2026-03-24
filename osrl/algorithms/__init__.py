@@ -4,3 +4,4 @@ from .bearl import BEARL, BEARLTrainer
 from .cdt import CDT, CDTTrainer
 from .coptidice import COptiDICE, COptiDICETrainer
 from .cpq import CPQ, CPQTrainer
+from .ccdt import ContrastiveCDT, ContrastiveCDTTrainer
