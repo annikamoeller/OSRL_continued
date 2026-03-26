@@ -16,11 +16,9 @@ from dsrl.offline_env import OfflineEnvWrapper, wrap_env
 from fsrl.utils import WandbLogger
 from osrl.common import SequenceDataset
 from osrl.common.exp_util import auto_name, seed_all
-
-# --- THESIS IMPORTS ---
 from examples.configs.ccdt_configs import ContrastiveCDTTrainConfig, CCDT_DEFAULT_CONFIG
 from osrl.algorithms.ccdt import ContrastiveCDT, ContrastiveCDTTrainer
-from osrl.common.probe_and_vis import evaluate_representations # Keep your probe!
+from osrl.common.probe_and_vis import evaluate_representations
 
 def get_cost_boundaries(data: dict, num_buckets: int) -> list:
     if num_buckets <= 1: return []
@@ -60,7 +58,7 @@ def train(args: ContrastiveCDTTrainConfig):
 
     # 2. Thesis Naming Convention
     env_short = args.task.split("-")[0].replace("Offline", "")
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")    
     args.name = f"{env_short}_{args.num_buckets}B_{args.pretrain_steps}Pre_{timestamp}"
     if args.group is None:
         args.group = f"{args.task}-contrastive-experiments"

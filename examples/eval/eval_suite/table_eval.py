@@ -1,23 +1,29 @@
 import os
 import pandas as pd
 import numpy as np
+import sys
+import argparse # <-- ADDED
 
-# --- CONFIGURATION ---
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-RAW_DATA_CSV = os.path.join(SCRIPT_DIR, "raw_eval_collection.csv")
-# Note: Ensure this path correctly points to your absolute dataset analysis folder
-STATS_CSV = "/home/20234949/thesis/OSRL_continued/dataset_analysis/master_dataset_stats.csv"
-OUTPUT_TABLE_CSV = os.path.join(SCRIPT_DIR, "publication_table_kappa10.csv")
+# Ensure the project root is in the path
+PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
+sys.path.insert(0, PROJECT_ROOT)
 
+# --- GLOBAL MASTER CONFIGURATION ---
+# We keep this static because it's your master reference file, not run-specific
+STATS_CSV = os.path.join(PROJECT_ROOT, "dataset_analysis", "master_dataset_stats.csv")
 EPSILON = 1e-8
 
-def generate_table():
-    if not os.path.exists(RAW_DATA_CSV):
-        raise FileNotFoundError(f"Missing {RAW_DATA_CSV}. Run data collection first.")
+def generate_table(run_dir):
+    # Dynamically build paths based on the run folder
+    raw_data_csv = os.path.join(run_dir, "raw_data.csv")
+    output_table_csv = os.path.join(run_dir, "publication_table_kappa10.csv")
+
+    if not os.path.exists(raw_data_csv):
+        raise FileNotFoundError(f"❌ Missing {raw_data_csv}. Did the collection script fail?")
     if not os.path.exists(STATS_CSV):
-        raise FileNotFoundError(f"Missing {STATS_CSV}. Please check the absolute path.")
+        raise FileNotFoundError(f"❌ Missing {STATS_CSV}. Please check your dataset analysis folder.")
         
-    raw_df = pd.read_csv(RAW_DATA_CSV)
+    raw_df = pd.read_csv(raw_data_csv)
     stats_df = pd.read_csv(STATS_CSV)
     stats_lookup = stats_df.set_index("Task").to_dict('index')
 
@@ -46,6 +52,7 @@ def generate_table():
         norm_reward = ((row["Raw_Eval_Reward"] - r_min) / (r_max - r_min + EPSILON)) * 100
         
         # Paper Formula for Table Cost: Actual Cost / Target Kappa
+        # Note: If target cost is 0, we add epsilon to avoid dividing by zero
         norm_cost = row["Raw_Eval_Cost"] / (row["Target_Cost"] + EPSILON)
         
         processed_records.append({
@@ -66,8 +73,8 @@ def generate_table():
     # Flatten multi-level columns (e.g., 'Norm_Reward', 'mean' -> 'Norm_Reward_mean')
     summary.columns = [f"{col[0]}_{col[1]}" for col in summary.columns]
     
-    # Save to CSV
-    summary.to_csv(OUTPUT_TABLE_CSV)
+    # Save to the specific run folder
+    summary.to_csv(output_table_csv)
     
     # Print a clean terminal output
     print("\n" + "═"*70)
@@ -75,7 +82,20 @@ def generate_table():
     print("═"*70)
     print(summary.to_string())
     print("═"*70)
-    print(f"✅ Table saved to: {OUTPUT_TABLE_CSV}")
+    print(f"✅ Table saved to: {output_table_csv}")
 
 if __name__ == "__main__":
-    generate_table()
+    # Setup Argument Parser to accept the FOLDER path
+    parser = argparse.ArgumentParser(description="Generate Publication Tables from Eval Data")
+    parser.add_argument("run_dir", type=str, help="Path to the timestamped run folder (e.g., examples/eval/eval_suite/eval_20260326_1436)")
+    args = parser.parse_args()
+
+    run_dir = args.run_dir
+    
+    # Check if the folder exists
+    if not os.path.isdir(run_dir):
+        print(f"❌ Error: The directory '{run_dir}' does not exist.")
+        sys.exit(1)
+
+    # Execute the table generation
+    generate_table(run_dir)

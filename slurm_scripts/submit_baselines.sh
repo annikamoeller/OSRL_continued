@@ -2,7 +2,7 @@
 
 # 1. Define the exact 5 tasks from the CDT paper
 TASKS=( 
-    # "OfflineAntRun-v0" 
+    "OfflineAntRun-v0" 
     "OfflineCarCircle-v0" 
     "OfflineCarRun-v0" 
     "OfflineDroneCircle-v0" 
@@ -28,13 +28,13 @@ submit_job() {
     sbatch <<EOF
 #!/bin/bash
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=OSRL_continued/logs/${JOB_NAME}_%j.log
-#SBATCH --error=OSRL_continued/logs/${JOB_NAME}_%j.err
-#SBATCH --time=12:00:00
+#SBATCH --output=logs/stdout/${JOB_NAME}_%j.log
+#SBATCH --error=logs/stdout/${JOB_NAME}_%j.err
+#SBATCH --time=10:00:00
 #SBATCH --partition=tue.gpu2.q
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
 #SBATCH --chdir=/home/20234949/thesis/OSRL_continued
 
 # Load HPC environment
@@ -53,7 +53,7 @@ python examples/train/train_ccdt.py \
     --seed $SEED \
     --batch_size $BATCH_SIZE \
     --device "cuda:0" \
-    --project "OSRL-baselines_new_repo" \
+    --project "OSRL-baselines" \
     --contrastive_weight 0.0 \
     --pretrain_steps 0 \
     --num_buckets 1 \

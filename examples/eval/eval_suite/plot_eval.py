@@ -4,29 +4,26 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import sys
+import argparse
 
 # Ensure the project root is in the path
 PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
 sys.path.insert(0, PROJECT_ROOT)
 
-# --- CONFIGURATION ---
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-RAW_DATA_CSV = os.path.join(SCRIPT_DIR, "raw_eval_collection.csv")
+# Ensure the project root is in the path
+PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
+sys.path.insert(0, PROJECT_ROOT)
 
-# FIX: Make the stats CSV path absolute so Python never loses it
 STATS_CSV = os.path.join(PROJECT_ROOT, "dataset_analysis", "master_dataset_stats.csv")
-
-OUTPUT_PLOT = os.path.join(SCRIPT_DIR, "eval_results.png")
-
 EPSILON = 1e-8
 
-def load_data():
-    if not os.path.exists(RAW_DATA_CSV):
-        raise FileNotFoundError(f"Missing {RAW_DATA_CSV}. Run data collection first.")
+def load_data(raw_data_csv):
+    if not os.path.exists(raw_data_csv):
+        raise FileNotFoundError(f"Missing {raw_data_csv}. Run data collection first.")
     if not os.path.exists(STATS_CSV):
         raise FileNotFoundError(f"Missing {STATS_CSV}. Run dataset analysis first.")
     
-    raw_df = pd.read_csv(RAW_DATA_CSV)
+    raw_df = pd.read_csv(raw_data_csv)
     stats_df = pd.read_csv(STATS_CSV)
     
     # Convert stats to a dictionary for easy lookup
@@ -63,7 +60,7 @@ def process_and_normalize(raw_df, stats_lookup):
         
     return pd.DataFrame(processed_records)
 
-def create_thesis_plot(df):
+def create_thesis_plot(df, output_plot_path):
     """Generates the grid of plots (Row 1: Reward, Row 2: Cost)."""
     sns.set_theme(style="whitegrid", font_scale=1.1)
     
@@ -109,15 +106,33 @@ def create_thesis_plot(df):
         axes[1, i].axvline(x=median_ds_cost, color='red', linestyle='--', alpha=0.5)
 
     plt.tight_layout()
-    plt.savefig(OUTPUT_PLOT, dpi=300, bbox_inches='tight')
-    print(f"\n✅ Plot successfully generated: {OUTPUT_PLOT}")
+    plt.savefig(output_plot_path, dpi=300, bbox_inches='tight')
+    print(f"\n✅ Plot successfully generated: {output_plot_path}")
 
 if __name__ == "__main__":
-    raw_df, stats_lookup = load_data()
+    import argparse
+    
+    # Setup Argument Parser to accept the FOLDER path
+    parser = argparse.ArgumentParser(description="Plot Safe RL Eval Results")
+    parser.add_argument("run_dir", type=str, help="Path to the timestamped run folder")
+    args = parser.parse_args()
+
+    run_dir = args.run_dir
+    
+    # Check if the folder exists
+    if not os.path.isdir(run_dir):
+        print(f"❌ Error: The directory '{run_dir}' does not exist.")
+        sys.exit(1)
+
+    # Standardized paths inside the specific run folder
+    raw_csv_path = os.path.join(run_dir, "raw_data.csv")
+    processed_csv_path = os.path.join(run_dir, "processed_data.csv")
+    output_plot_path = os.path.join(run_dir, "eval_plot.png")
+
+    # Execute Pipeline
+    raw_df, stats_lookup = load_data(raw_csv_path)
     processed_df = process_and_normalize(raw_df, stats_lookup)
     
-    # Save the processed data for your records
-    processed_df.to_csv(os.path.join(SCRIPT_DIR, "processed_eval_results.csv"), index=False)
-    
-    # Generate the visualization
-    create_thesis_plot(processed_df)
+    # Save processed data and plot inside the same folder
+    processed_df.to_csv(processed_csv_path, index=False)
+    create_thesis_plot(processed_df, output_plot_path)
