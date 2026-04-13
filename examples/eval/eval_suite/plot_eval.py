@@ -64,13 +64,20 @@ def create_thesis_plot(df, output_plot_path):
     """Generates the grid of plots (Row 1: Reward, Row 2: Cost)."""
     sns.set_theme(style="whitegrid", font_scale=1.1)
     
+    # 🚨 CRITICAL FIX: Force 'Buckets' to be a string category. 
+    # If it's an integer, Seaborn will try to draw a continuous color gradient!
+    df['Buckets'] = df['Buckets'].astype(str) + " Buckets"
+    
     tasks = sorted(df['Clean_Task'].unique())
     num_tasks = len(tasks)
     
     # Create a 2 x N grid
-    fig, axes = plt.subplots(2, num_tasks, figsize=(4.5 * num_tasks, 8), sharex=True)
+    fig, axes = plt.subplots(2, num_tasks, figsize=(5 * num_tasks, 8), sharex=True)
     if num_tasks == 1: 
         axes = axes.reshape(2, 1)
+
+    # Set distinct colors for Front and Back so they pop
+    palette = {"Front": "#e74c3c", "Back": "#3498db"} # Red vs Blue
 
     for i, task in enumerate(tasks):
         task_df = df[df['Clean_Task'] == task]
@@ -80,20 +87,27 @@ def create_thesis_plot(df, output_plot_path):
         sns.lineplot(
             ax=axes[0, i], data=task_df, 
             x="Target_Cost", y="Norm_Reward", 
-            hue="Variant", marker="o", 
+            hue="Architecture",    # Color = Front/Back
+            style="Buckets",       # Line Style = 2, 3, 5, 10
+            palette=palette,
+            markers=True, dashes=True,
             legend=(i == num_tasks - 1) # Only put legend on the last plot
         )
         axes[0, i].set_title(task, fontweight='bold')
         axes[0, i].set_ylabel("Normalized Reward (%)" if i == 0 else "")
         
         # Vertical line for median dataset cost
-        axes[0, i].axvline(x=median_ds_cost, color='red', linestyle='--', alpha=0.5, label="Dataset Median Cost")
+        axes[0, i].axvline(x=median_ds_cost, color='k', linestyle='--', alpha=0.3, label="Dataset Median")
         
         # --- ROW 2: Evaluated Cost ---
         sns.lineplot(
             ax=axes[1, i], data=task_df, 
             x="Target_Cost", y="Raw_Eval_Cost", 
-            hue="Variant", marker="s", legend=False
+            hue="Architecture", 
+            style="Buckets", 
+            palette=palette,
+            markers=True, dashes=True, 
+            legend=False
         )
         # Ideal Y=X constraint line
         sweep_vals = sorted(task_df["Target_Cost"].unique())
@@ -102,8 +116,11 @@ def create_thesis_plot(df, output_plot_path):
         axes[1, i].set_ylabel("Actual Evaluated Cost" if i == 0 else "")
         axes[1, i].set_xlabel("Target Cost Prompt")
         
-        # Vertical line for median dataset cost
-        axes[1, i].axvline(x=median_ds_cost, color='red', linestyle='--', alpha=0.5)
+        axes[1, i].axvline(x=median_ds_cost, color='k', linestyle='--', alpha=0.3)
+
+    # Fix the legend so it sits outside the plot and doesn't cover your data
+    if num_tasks > 0:
+        axes[0, num_tasks - 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
     plt.tight_layout()
     plt.savefig(output_plot_path, dpi=300, bbox_inches='tight')

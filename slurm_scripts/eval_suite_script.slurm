@@ -1,8 +1,8 @@
 #!/bin/sh
 #SBATCH --job-name=cdt_eval_suite
 #SBATCH --output=logs/slurm_%j.out
-#SBATCH --partition=tue.gpu1.q
-#SBATCH --time=1:00:00
+#SBATCH --partition=tue.gpu1.q,tue.gpu2.q,tue.gpu3.q,mcs.gpu.q
+#SBATCH --time=4:00:00
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=6G
@@ -18,7 +18,7 @@ echo "🚀 Starting Full Evaluation Pipeline..."
 # 2. Run Data Collection
 # (Assuming you saved the collection script as collect_eval.py)
 # We use 'tee' to print to the Slurm log AND a temporary file
-python examples/eval/eval_suite/collect_eval.py | tee temp_eval_output.log
+python examples/eval/eval_suite/collect_eval_v2.py | tee temp_eval_output.log
 
 # 3. Extract the Run Directory
 # We grep the temporary file to find the exact timestamped folder that was created

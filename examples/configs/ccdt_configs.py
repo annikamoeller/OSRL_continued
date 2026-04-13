@@ -13,6 +13,7 @@ class ContrastiveCDTTrainConfig(CDTTrainConfig):
     eval_every: int = 5000     
     # We override update_steps to be 100k by default instead of whatever CDT uses
     update_steps: int = 100_000          
+    encoder_type: str = "back"
 
 # We will just map your model to use the exact same tuned defaults as the baseline!
 CCDT_DEFAULT_CONFIG = CDT_DEFAULT_CONFIG

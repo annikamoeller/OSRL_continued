@@ -1,6 +1,6 @@
 Task,Variant,Norm_Reward_mean,Norm_Reward_std,Norm_Cost_mean,Norm_Cost_std
-AntRun,CCDT-1B,69.35,0.4,0.81,0.04
-CarCircle,CCDT-1B,71.81,0.47,1.16,0.31
-CarRun,CCDT-1B,98.94,0.15,0.7,0.09
-DroneCircle,CCDT-1B,56.47,0.1,0.54,0.04
-DroneRun,CCDT-1B,58.33,0.1,0.2,0.1
+AntRun,CCDT-1B,       69.35, 0.4,           0.81, 0.04
+CarCircle,CCDT-1B,    71.81, 0.47,          1.16, 0.31
+CarRun,CCDT-1B,       98.94, 0.15,          0.7,  0.09
+DroneCircle,CCDT-1B,  56.47, 0.1,           0.54, 0.04
+DroneRun,CCDT-1B,     58.33, 0.1            0.2,  0.1

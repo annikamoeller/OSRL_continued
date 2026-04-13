@@ -17,7 +17,7 @@ from fsrl.utils import WandbLogger
 from osrl.common import SequenceDataset
 from osrl.common.exp_util import auto_name, seed_all
 from examples.configs.ccdt_configs import ContrastiveCDTTrainConfig, CCDT_DEFAULT_CONFIG
-from osrl.algorithms.ccdt import ContrastiveCDT, ContrastiveCDTTrainer
+from osrl.algorithms.ccdt import ContrastiveCDTFront, ContrastiveCDTBack, ContrastiveCDTTrainer
 from osrl.common.probe_and_vis import evaluate_representations
 
 def get_cost_boundaries(data: dict, num_buckets: int) -> list:
@@ -96,7 +96,7 @@ def train(args: ContrastiveCDTTrainConfig):
     env = OfflineEnvWrapper(env)
 
     # 4. Model Setup
-    model = ContrastiveCDT(
+    model_kwargs = dict(
         state_dim=env.observation_space.shape[0], action_dim=env.action_space.shape[0],
         max_action=env.action_space.high[0], embedding_dim=args.embedding_dim,
         contrastive_dim=args.contrastive_dim, seq_len=args.seq_len,
@@ -108,7 +108,20 @@ def train(args: ContrastiveCDTTrainConfig):
         cat_cost_feat=args.cat_cost_feat, action_head_layers=args.action_head_layers,
         cost_prefix=args.cost_prefix, stochastic=args.stochastic,
         init_temperature=args.init_temperature, target_entropy=-env.action_space.shape[0],
-    ).to(args.device)
+    )
+
+    # Create either Front or Back Encoder version
+    if getattr(args, "encoder_type", "back").lower() == "front":
+        print("\n🚀 [CCDT Setup] Initializing FRONT-Encoder Architecture...\n")
+        model = ContrastiveCDTFront(**model_kwargs).to(args.device)
+    else:
+        print("\n🚀 [CCDT Setup] Initializing TRUE BACK-Encoder Architecture...\n")
+        model = ContrastiveCDTBack(**model_kwargs).to(args.device)
+
+    def checkpoint_fn():
+        return {"model_state": model.state_dict()}
+    logger.setup_checkpoint_fn(checkpoint_fn)
+    
 
     def checkpoint_fn():
         return {"model_state": model.state_dict()}

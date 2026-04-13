@@ -21,12 +21,9 @@ LOG_ROOT = "/home/20234949/thesis/OSRL_continued/logs"
 BASE_EVAL_DIR = "examples/eval/eval_suite"
 STATS_CSV = "/home/20234949/thesis/OSRL_continued/dataset_analysis/master_dataset_stats.csv"
 
-# Create a new folder named by the current minute
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 RUN_DIR = os.path.join(BASE_EVAL_DIR, f"eval_{timestamp}")
 os.makedirs(RUN_DIR, exist_ok=True)
-
-# Standardize the output name inside this specific folder
 OUTPUT_CSV = os.path.join(RUN_DIR, "raw_data.csv")
 
 TARGET_COST_SWEEP = [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]
@@ -34,9 +31,8 @@ NUM_EPISODES = 20
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 def collect_raw_eval_data():
-    results = []
+    results = [] # We keep this just to return at the end if needed
     
-    # 1. Load the Ground Truth Dataset Stats
     if not os.path.exists(STATS_CSV):
         raise FileNotFoundError(f"❌ Missing {STATS_CSV}. Check the absolute path.")
     
@@ -44,17 +40,23 @@ def collect_raw_eval_data():
     stats_df = pd.read_csv(STATS_CSV)
     stats_lookup = stats_df.set_index("Task").to_dict('index')
     
-    search_pattern = os.path.join(LOG_ROOT, "**", "config.yaml")
+    # Target specifically the config files in the Bucket Sweeps
+    search_pattern = os.path.join(LOG_ROOT, "Bucket_Sweep_*", "**", "config.yaml")
     config_files = glob.glob(search_pattern, recursive=True)
-    
     print(f"🔍 Found {len(config_files)} experiments. Starting raw collection...")
+
+    # --- THE FIX 1: INITIALIZE THE CSV WITH HEADERS ---
+    columns = ["Task", "Seed", "Architecture", "Buckets", "Variant", 
+               "Target_Cost", "Target_Reward", "Raw_Eval_Cost", "Raw_Eval_Reward", "Avg_Episode_Length"]
+    pd.DataFrame(columns=columns).to_csv(OUTPUT_CSV, index=False)
+    print(f"📁 Initialized incremental save file: {OUTPUT_CSV}")
 
     for config_path in config_files:
         exp_dir = os.path.dirname(config_path)
         print(f"\n📦 Loading: {exp_dir}")
         
         try:
-            # 2. Load Config & Model Weights
+            # 1. Load Config & Model Weights
             try:
                 cfg, model_weights = load_config_and_model(exp_dir, best=False)
             except:
@@ -62,18 +64,27 @@ def collect_raw_eval_data():
 
             seed_all(cfg["seed"])
         
-            # 3. Environment Setup
+            # 2. Environment Setup
             base_env = gym.make(cfg["task"])
             env = wrap_env(env=base_env, reward_scale=cfg["reward_scale"])
             env = OfflineEnvWrapper(env)
 
+            # 3. Dynamic Architecture Selection
+            project_name = cfg.get("project", "")
+            encoder_type = cfg.get("encoder_type", "front").lower() 
+            is_back_encoder = "back" in project_name.lower() or encoder_type == "back"
+            ModelClass = ContrastiveCDTBack if is_back_encoder else ContrastiveCDTFront
+            
+            arch_label = "Back" if is_back_encoder else "Front"
+            print(f"  🧠 Detected Architecture: {arch_label}-Encoder")
+
             # 4. Initialize Model 
-            model = ContrastiveCDTBack(
+            model = ModelClass(
                 state_dim=env.observation_space.shape[0],
                 action_dim=env.action_space.shape[0],
                 max_action=env.action_space.high[0],
                 embedding_dim=cfg["embedding_dim"],
-                contrastive_dim=64, 
+                contrastive_dim=cfg.get("contrastive_dim", 64), 
                 seq_len=cfg["seq_len"],
                 episode_len=cfg["episode_len"],
                 num_layers=cfg["num_layers"],
@@ -90,27 +101,17 @@ def collect_raw_eval_data():
             
             # 5. Initialize Trainer
             trainer = ContrastiveCDTTrainer(
-                model, 
-                env, 
-                cost_boundaries=None,
-                device=DEVICE,
-                reward_scale=cfg["reward_scale"],
-                cost_scale=cfg["cost_scale"]
+                model, env, cost_boundaries=None, device=DEVICE,
+                reward_scale=cfg["reward_scale"], cost_scale=cfg["cost_scale"]
             )
             
-            # 6. Calculate Target Prompts (The Bulletproof Way)
+            # 6. Calculate Target Prompts
             clean_task_name = cfg["task"].replace("Offline", "").replace("-v0", "")
             match = next((k for k in stats_lookup.keys() if clean_task_name in k), None)
-            
-            if match:
-                dataset_max_reward = stats_lookup[match]["Return_Max"]
-                print(f"  🎯 Exact Match Found! Max Dataset Reward for {clean_task_name}: {dataset_max_reward}")
-            else:
-                print(f"  ⚠️ No exact stats match for {clean_task_name}. Falling back to config.")
-                dataset_max_reward = cfg.get("max_reward", 1000.0)
+            dataset_max_reward = stats_lookup[match]["Return_Max"] if match else cfg.get("max_reward", 1000.0)
                 
-            # Set target to exactly 100% of what the model has actually seen
             target_reward = 1.0 * dataset_max_reward
+            num_buckets = cfg.get('num_buckets', 1)
             
             # 7. The Evaluation Sweep
             for target_cost in TARGET_COST_SWEEP:
@@ -122,33 +123,32 @@ def collect_raw_eval_data():
                     target_cost=target_cost * cfg["cost_scale"]
                 )
                 
-                results.append({
+                # Create the data dictionary
+                row_data = {
                     "Task": clean_task_name,
                     "Seed": cfg["seed"],
-                    "Variant": f"CCDT-{cfg.get('num_buckets', 1)}B",
+                    "Architecture": arch_label,               
+                    "Buckets": num_buckets,                   
+                    "Variant": f"{arch_label}-{num_buckets}B",
                     "Target_Cost": target_cost,
                     "Target_Reward": target_reward,
                     "Raw_Eval_Cost": raw_eval_cost,
                     "Raw_Eval_Reward": raw_eval_ret,
                     "Avg_Episode_Length": ep_length
-                })
+                }
+                
+                results.append(row_data)
+                
+                # --- THE FIX 2: INCREMENTAL SAVE ---
+                # Convert this single row to a DataFrame and append it to the CSV
+                pd.DataFrame([row_data]).to_csv(OUTPUT_CSV, mode='a', header=False, index=False)
                 
         except Exception as e:
             print(f"❌ Error processing {exp_dir}:")
             traceback.print_exc()
 
-    # 8. Save the DataFrame
-    df = pd.DataFrame(results)
-    if not df.empty:
-        df.to_csv(OUTPUT_CSV, index=False)
-        print(f"\n✅ Collection complete! Data saved to: {RUN_DIR}")
-        print(f"👉 To complete the pipeline, run:")
-        print(f"   python examples/eval/plot_eval.py {RUN_DIR}")
-        print(f"   python examples/eval/table_eval.py {RUN_DIR}")
-    else:
-        print("\n⚠️ No data collected.")
-
-    return df
+    print(f"\n✅ Collection complete! Data safely stored in: {RUN_DIR}")
+    return pd.DataFrame(results)
 
 if __name__ == "__main__":
     collect_raw_eval_data()

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import List
 from pyrallis import field
 
-from osrl.algorithms.ccdt import ContrastiveCDT, ContrastiveCDTTrainer
+from osrl.algorithms.ccdt import ContrastiveCDTFront, ContrastiveCDTBack, ContrastiveCDTTrainer
 from osrl.common.exp_util import load_config_and_model, seed_all
 from dsrl.offline_env import OfflineEnvWrapper, wrap_env
 
@@ -29,7 +29,7 @@ def eval(args: EvalConfig):
     env = OfflineEnvWrapper(env)
 
     # 4. Initialize the ContrastiveCDT exactly as it was trained
-    model = ContrastiveCDT(
+    model = ContrastiveCDTBack(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.shape[0],
         max_action=env.action_space.high[0],
