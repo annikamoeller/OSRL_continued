@@ -4,7 +4,8 @@
 # EXPERIMENT CONFIGURATION
 # ==========================================
 ARCH="back"
-WANDB_PROJECT="CCDT_Back_Architecture"
+# 🚨 UPDATED: Appended cw04 to isolate from the 0.1 runs
+WANDB_PROJECT="CCDT_Back_Architecture_cw04"
 
 # Define the environments you want to test
 ENVS=(
@@ -19,6 +20,8 @@ ENVS=(
 BUCKETS=(2 3 5 8 10)
 
 mkdir -p slurm_logs
+# 🚨 UPDATED: Ensure the new log directory exists
+mkdir -p logs/stdout_cw04
 
 # ==========================================
 # SUBMISSION LOOP
@@ -26,15 +29,17 @@ mkdir -p slurm_logs
 for ENV in "${ENVS[@]}"; do
     for B in "${BUCKETS[@]}"; do
         
-        JOB_NAME="back_${ENV}_${B}B"
+        # 🚨 UPDATED: Job name now reflects the cw04 run
+        JOB_NAME="back_cw04_${ENV}_${B}B"
         
         echo "Submitting: $JOB_NAME"
 
         sbatch <<EOF
 #!/bin/bash
 #SBATCH --job-name=$JOB_NAME
-#SBATCH --output=logs/stdout/%x_%j.out
-#SBATCH --error=logs/stdout/%x_%j.err
+# 🚨 UPDATED: Rerouting stdout/error logs to avoid overwriting old ones
+#SBATCH --output=logs/stdout_cw04/%x_%j.out
+#SBATCH --error=logs/stdout_cw04/%x_%j.err
 #SBATCH --partition=tue.gpu1.q,tue.gpu2.q,tue.gpu3.q,mcs.gpu.q
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -55,13 +60,14 @@ python examples/train/train_ccdt.py \
     --encoder_type $ARCH \
     --num_buckets $B \
     --project $WANDB_PROJECT \
-    --group "Bucket_Sweep_${ENV}" \
+    --group "Bucket_Sweep_cw04_${ENV}" \
     --eval_every 5000 \
     --probe_every 5000 \
+    --contrastive_weight 0.4 \
     --device "cuda:0"
 EOF
 
     done
 done
 
-echo "🎉 All Back-Encoder jobs submitted to the dynamic queue!"
+echo "🎉 All Back-Encoder cw0.4 jobs submitted to the dynamic queue!"

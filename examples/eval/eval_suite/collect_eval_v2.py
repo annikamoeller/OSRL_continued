@@ -41,7 +41,7 @@ def collect_raw_eval_data():
     stats_lookup = stats_df.set_index("Task").to_dict('index')
     
     # Target specifically the config files in the Bucket Sweeps
-    search_pattern = os.path.join(LOG_ROOT, "Bucket_Sweep_*", "**", "config.yaml")
+    search_pattern = os.path.join(LOG_ROOT, "Bucket_Sweep_cw_04_*", "**", "config.yaml")
     config_files = glob.glob(search_pattern, recursive=True)
     print(f"🔍 Found {len(config_files)} experiments. Starting raw collection...")
 

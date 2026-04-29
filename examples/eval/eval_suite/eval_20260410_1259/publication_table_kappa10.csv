@@ -1,3 +1,0 @@
-Task,Variant,Norm_Reward_mean,Norm_Reward_std,Norm_Cost_mean,Norm_Cost_std
-AntRun,Back-10B,70.46,,1.43,
-AntRun,Front-10B,68.82,,1.12,

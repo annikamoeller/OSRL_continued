@@ -10,10 +10,6 @@ import argparse
 PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
 sys.path.insert(0, PROJECT_ROOT)
 
-# Ensure the project root is in the path
-PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
-sys.path.insert(0, PROJECT_ROOT)
-
 STATS_CSV = os.path.join(PROJECT_ROOT, "dataset_analysis", "master_dataset_stats.csv")
 EPSILON = 1e-8
 
@@ -64,9 +60,8 @@ def create_thesis_plot(df, output_plot_path):
     """Generates the grid of plots (Row 1: Reward, Row 2: Cost)."""
     sns.set_theme(style="whitegrid", font_scale=1.1)
     
-    # 🚨 CRITICAL FIX: Force 'Buckets' to be a string category. 
-    # If it's an integer, Seaborn will try to draw a continuous color gradient!
-    df['Buckets'] = df['Buckets'].astype(str) + " Buckets"
+    # Format the Buckets column for the legend, ignoring the Vanilla baseline
+    df['Buckets'] = df['Buckets'].apply(lambda x: f"{x} Buckets" if str(x).isdigit() else str(x))
     
     tasks = sorted(df['Clean_Task'].unique())
     num_tasks = len(tasks)
@@ -76,8 +71,8 @@ def create_thesis_plot(df, output_plot_path):
     if num_tasks == 1: 
         axes = axes.reshape(2, 1)
 
-    # Set distinct colors for Front and Back so they pop
-    palette = {"Front": "#e74c3c", "Back": "#3498db"} # Red vs Blue
+    # 🚨 ADDED: A distinct color (Dark Slate) for the Vanilla baseline
+    palette = {"Front": "#e74c3c", "Back": "#3498db", "Vanilla": "#2c3e50"} 
 
     for i, task in enumerate(tasks):
         task_df = df[df['Clean_Task'] == task]
@@ -87,16 +82,14 @@ def create_thesis_plot(df, output_plot_path):
         sns.lineplot(
             ax=axes[0, i], data=task_df, 
             x="Target_Cost", y="Norm_Reward", 
-            hue="Architecture",    # Color = Front/Back
-            style="Buckets",       # Line Style = 2, 3, 5, 10
+            hue="Architecture",    
+            style="Buckets",       
             palette=palette,
             markers=True, dashes=True,
-            legend=(i == num_tasks - 1) # Only put legend on the last plot
+            legend=(i == num_tasks - 1) 
         )
         axes[0, i].set_title(task, fontweight='bold')
         axes[0, i].set_ylabel("Normalized Reward (%)" if i == 0 else "")
-        
-        # Vertical line for median dataset cost
         axes[0, i].axvline(x=median_ds_cost, color='k', linestyle='--', alpha=0.3, label="Dataset Median")
         
         # --- ROW 2: Evaluated Cost ---
@@ -115,10 +108,9 @@ def create_thesis_plot(df, output_plot_path):
         
         axes[1, i].set_ylabel("Actual Evaluated Cost" if i == 0 else "")
         axes[1, i].set_xlabel("Target Cost Prompt")
-        
         axes[1, i].axvline(x=median_ds_cost, color='k', linestyle='--', alpha=0.3)
 
-    # Fix the legend so it sits outside the plot and doesn't cover your data
+    # Fix the legend so it sits outside the plot
     if num_tasks > 0:
         axes[0, num_tasks - 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
@@ -127,29 +119,43 @@ def create_thesis_plot(df, output_plot_path):
     print(f"\n✅ Plot successfully generated: {output_plot_path}")
 
 if __name__ == "__main__":
-    import argparse
-    
-    # Setup Argument Parser to accept the FOLDER path
     parser = argparse.ArgumentParser(description="Plot Safe RL Eval Results")
     parser.add_argument("run_dir", type=str, help="Path to the timestamped run folder")
+    # 🚨 ADDED: Optional argument for the Vanilla CSV
+    parser.add_argument("--vanilla_csv", type=str, default=None, help="Optional path to a vanilla CDT baseline CSV")
     args = parser.parse_args()
 
     run_dir = args.run_dir
     
-    # Check if the folder exists
     if not os.path.isdir(run_dir):
         print(f"❌ Error: The directory '{run_dir}' does not exist.")
         sys.exit(1)
 
-    # Standardized paths inside the specific run folder
     raw_csv_path = os.path.join(run_dir, "raw_data.csv")
     processed_csv_path = os.path.join(run_dir, "processed_data.csv")
     output_plot_path = os.path.join(run_dir, "eval_plot.png")
 
-    # Execute Pipeline
+    # Execute main processing Pipeline
     raw_df, stats_lookup = load_data(raw_csv_path)
     processed_df = process_and_normalize(raw_df, stats_lookup)
     
-    # Save processed data and plot inside the same folder
+    # 🚨 ADDED: Integrate the Vanilla Baseline if provided
+    if args.vanilla_csv and os.path.exists(args.vanilla_csv):
+        print(f"📥 Loading Vanilla Baseline from {args.vanilla_csv}...")
+        vanilla_df = pd.read_csv(args.vanilla_csv)
+        
+        # Ensure the Vanilla CSV has the required normalized columns, process if missing
+        if "Clean_Task" not in vanilla_df.columns or "Norm_Reward" not in vanilla_df.columns:
+            vanilla_df = process_and_normalize(vanilla_df, stats_lookup)
+            
+        # Standardize the categories so Seaborn plots it as a distinct baseline
+        vanilla_df["Architecture"] = "Vanilla"
+        vanilla_df["Buckets"] = "Baseline"
+        vanilla_df["Variant"] = "Vanilla Baseline"
+        
+        # Combine the dataframes
+        processed_df = pd.concat([processed_df, vanilla_df], ignore_index=True)
+    
+    # Save combined processed data and generate the plot
     processed_df.to_csv(processed_csv_path, index=False)
     create_thesis_plot(processed_df, output_plot_path)
