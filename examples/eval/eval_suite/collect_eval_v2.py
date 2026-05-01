@@ -6,6 +6,7 @@ import traceback
 import gymnasium as gym
 import sys
 import datetime
+import argparse
 
 # --- PATH SETUP ---
 sys.path.insert(0, "/home/20234949/thesis/OSRL_continued")
@@ -30,7 +31,7 @@ TARGET_COST_SWEEP = [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]
 NUM_EPISODES = 20 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-def collect_raw_eval_data():
+def collect_raw_eval_data(log_filter):
     results = [] # We keep this just to return at the end if needed
     
     if not os.path.exists(STATS_CSV):
@@ -40,16 +41,20 @@ def collect_raw_eval_data():
     stats_df = pd.read_csv(STATS_CSV)
     stats_lookup = stats_df.set_index("Task").to_dict('index')
     
-    # Target specifically the config files in the Bucket Sweeps
-    search_pattern = os.path.join(LOG_ROOT, "Bucket_Sweep_cw_04_*", "**", "config.yaml")
+    # --- DYNAMIC SEARCH PATTERN ---
+    # Uses the log_filter argument
+    search_pattern = os.path.join(LOG_ROOT, log_filter, "**", "config.yaml")
     config_files = glob.glob(search_pattern, recursive=True)
+    
+    if not config_files:
+        print(f"❌ No config files found matching pattern: {search_pattern}")
+        return
+
     print(f"🔍 Found {len(config_files)} experiments. Starting raw collection...")
 
-    # --- THE FIX 1: INITIALIZE THE CSV WITH HEADERS ---
     columns = ["Task", "Seed", "Architecture", "Buckets", "Variant", 
                "Target_Cost", "Target_Reward", "Raw_Eval_Cost", "Raw_Eval_Reward", "Avg_Episode_Length"]
     pd.DataFrame(columns=columns).to_csv(OUTPUT_CSV, index=False)
-    print(f"📁 Initialized incremental save file: {OUTPUT_CSV}")
 
     for config_path in config_files:
         exp_dir = os.path.dirname(config_path)
@@ -151,4 +156,10 @@ def collect_raw_eval_data():
     return pd.DataFrame(results)
 
 if __name__ == "__main__":
-    collect_raw_eval_data()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log_filter", type=str, default="Bucket_Sweep_cw04_*", 
+                        help="Folder pattern in logs/ to search for")
+    args = parser.parse_args()
+    
+    # This passes the argument from your bash script into the function
+    collect_raw_eval_data(args.log_filter)
