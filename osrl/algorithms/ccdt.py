@@ -118,7 +118,7 @@ class ContrastiveCDTFront(BaseContrastiveCDT):
         
         # Project raw embeddings into contrastive dimension
         self.compress = nn.Sequential(
-            nn.Linear(4 * self.embedding_dim, self.contrastive_dim),
+            nn.Linear(2 * self.embedding_dim, self.contrastive_dim),
             nn.ReLU(inplace=True)
         )
 
@@ -130,9 +130,12 @@ class ContrastiveCDTFront(BaseContrastiveCDT):
         latents = None
         if return_latents:
             # Pass raw embeddings through contrastive component first
-            combined_emb = torch.cat(raw_embs, dim=-1)
+            s_emb = raw_embs[0] 
+            a_emb = raw_embs[1] 
+            
+            combined_emb = torch.cat([s_emb, a_emb], dim=-1)
             latents = self.compress(combined_emb)
-
+            
         # Get transformer output separately
         transformer_out = self._process_transformer(seq_list, padding_mask, episode_cost, batch_size, seq_len) 
         action_preds, cost_preds, state_preds = self._generate_predictions(transformer_out, time_embs[3])
@@ -177,12 +180,8 @@ class ContrastiveCDTBack(BaseContrastiveCDT):
             contextualized_state = transformer_out[:, self.seq_repeat - 2]
             contextualized_action = transformer_out[:, self.seq_repeat - 1]
             
-            # cross-condition the transformer outputs with the cost token
-            state_conditioned = contextualized_state * time_c
-            action_conditioned = contextualized_action * time_c
-            
             # final pass back to contrastive head
-            latents = self.contrastive_head(state_conditioned + action_conditioned)
+            latents = self.contrastive_head(contextualized_state + contextualized_action)
 
         if return_latents:
             return action_preds, cost_preds, state_preds, latents
