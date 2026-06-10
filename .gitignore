@@ -10,6 +10,9 @@ envs/safety-gym/mujoco200_linux
 
 *vscode
 
+examples/eval/cluster_eval/*
+datasets/* 
+
 **/figure/**
 **/wandb/**
 **/log/**

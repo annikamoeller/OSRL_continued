@@ -16,24 +16,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 from osrl.algorithms.cdt import CDT
 
+
 class BaseContrastiveCDT(CDT):
     """
-    Shared base class that holds the heavy lifting helper functions 
+    Shared base class that holds the heavy lifting helper functions
     so the specific architectures remain clean and readable.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def _prepare_embeddings(self, states, actions, returns_to_go, costs_to_go, time_steps):
         # create timestep embedding
-        timestep_emb = self.timestep_emb(time_steps) if self.time_emb else 0.0 
+        timestep_emb = self.timestep_emb(time_steps) if self.time_emb else 0.0
 
         raw_state_emb = self.state_emb(states)
         raw_act_emb = self.action_emb(actions)
-        
+
         # concatenate state and action embeddings with timestep embedding
-        state_emb = raw_state_emb + timestep_emb 
-        act_emb = raw_act_emb + timestep_emb 
+        state_emb = raw_state_emb + timestep_emb
+        act_emb = raw_act_emb + timestep_emb
         seq_list = [state_emb, act_emb]
 
         # transform C2G for numerical stability
@@ -42,12 +44,12 @@ class BaseContrastiveCDT(CDT):
 
         raw_costs_emb, raw_returns_emb = None, None
         costs_emb, returns_emb = None, None
-        
+
         if self.use_cost:
             raw_costs_emb = self.cost_emb(costs_to_go.unsqueeze(-1))
             costs_emb = raw_costs_emb + timestep_emb
             seq_list.insert(0, costs_emb)
-            
+
         if self.use_rew:
             raw_returns_emb = self.return_emb(returns_to_go.unsqueeze(-1))
             returns_emb = raw_returns_emb + timestep_emb
@@ -55,7 +57,7 @@ class BaseContrastiveCDT(CDT):
 
         raw_embeddings = (raw_state_emb, raw_act_emb, raw_returns_emb, raw_costs_emb)
         time_embeddings = (state_emb, act_emb, returns_emb, costs_emb)
-        
+
         return seq_list, raw_embeddings, time_embeddings
 
     def _process_transformer(self, seq_list, padding_mask, episode_cost, batch_size, seq_len):
@@ -77,7 +79,8 @@ class BaseContrastiveCDT(CDT):
             out = block(out, padding_mask=padding_mask)
 
         out = self.out_norm(out)
-        if self.cost_prefix: out = out[:, 1:]
+        if self.cost_prefix:
+            out = out[:, 1:]
 
         out = out.reshape(batch_size, seq_len, self.seq_repeat, self.embedding_dim)
         return out.permute(0, 2, 1, 3)
@@ -87,99 +90,127 @@ class BaseContrastiveCDT(CDT):
         state_feat = transformer_out[:, self.seq_repeat - 2]
 
         if self.use_cost:
-            if self.add_cost_feat: state_feat = state_feat + costs_emb.detach()
-            if self.mul_cost_feat: state_feat = state_feat * costs_emb.detach()
-            if self.cat_cost_feat: state_feat = torch.cat([state_feat, costs_emb.detach()], dim=2)
+            if self.add_cost_feat:
+                state_feat = state_feat + costs_emb.detach()
+            if self.mul_cost_feat:
+                state_feat = state_feat * costs_emb.detach()
+            if self.cat_cost_feat:
+                state_feat = torch.cat([state_feat, costs_emb.detach()], dim=2)
 
         action_preds = self.action_head(state_feat)
         cost_preds = F.log_softmax(self.cost_pred_head(action_feature), dim=-1)
         state_preds = self.state_pred_head(action_feature)
-        
+
         return action_preds, cost_preds, state_preds
-    
+
+
 class ContrastiveCDTFront(BaseContrastiveCDT):
     def __init__(self, contrastive_dim=64, **kwargs):
         super().__init__(**kwargs)
         self.contrastive_dim = contrastive_dim
-        
+
         # MLPs for state and action embeddings
         self.state_emb = nn.Sequential(
             nn.Linear(self.state_dim, self.embedding_dim),
             nn.LeakyReLU(inplace=True),
             nn.Linear(self.embedding_dim, self.embedding_dim),
-            nn.LeakyReLU(inplace=True)
+            nn.LeakyReLU(inplace=True),
         )
         self.action_emb = nn.Sequential(
             nn.Linear(self.action_dim, self.embedding_dim),
             nn.LeakyReLU(inplace=True),
             nn.Linear(self.embedding_dim, self.embedding_dim),
-            nn.LeakyReLU(inplace=True)
-        )
-        
-        # Project raw embeddings into contrastive dimension
-        self.compress = nn.Sequential(
-            nn.Linear(2 * self.embedding_dim, self.contrastive_dim),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True),
         )
 
-    def forward(self, states, actions, returns_to_go, costs_to_go, time_steps, padding_mask=None, episode_cost=None, return_latents=False):
+        # Project raw embeddings into contrastive dimension
+        self.compress = nn.Sequential(nn.Linear(2 * self.embedding_dim, self.contrastive_dim), nn.ReLU(inplace=True))
+
+        # Project raw embeddings into contrastive dimension
+        self.compress = nn.Sequential(nn.Linear(4 * self.embedding_dim, self.contrastive_dim), nn.ReLU(inplace=True))
+
+    def forward(
+        self,
+        states,
+        actions,
+        returns_to_go,
+        costs_to_go,
+        time_steps,
+        padding_mask=None,
+        episode_cost=None,
+        return_latents=False,
+    ):
         batch_size, seq_len = states.shape[0], states.shape[1]
 
-        seq_list, raw_embs, time_embs = self._prepare_embeddings(states, actions, returns_to_go, costs_to_go, time_steps)
-        
+        seq_list, raw_embs, time_embs = self._prepare_embeddings(
+            states, actions, returns_to_go, costs_to_go, time_steps
+        )
+
         latents = None
         if return_latents:
             # Pass raw embeddings through contrastive component first
-            s_emb = raw_embs[0] 
-            a_emb = raw_embs[1] 
-            
+            s_emb = raw_embs[0]
+            a_emb = raw_embs[1]
+
             combined_emb = torch.cat([s_emb, a_emb], dim=-1)
             latents = self.compress(combined_emb)
-            
+
         # Get transformer output separately
-        transformer_out = self._process_transformer(seq_list, padding_mask, episode_cost, batch_size, seq_len) 
+        transformer_out = self._process_transformer(seq_list, padding_mask, episode_cost, batch_size, seq_len)
         action_preds, cost_preds, state_preds = self._generate_predictions(transformer_out, time_embs[3])
 
         if return_latents:
             return action_preds, cost_preds, state_preds, latents
         return action_preds, cost_preds, state_preds
-    
+
 
 class ContrastiveCDTBack(BaseContrastiveCDT):
     def __init__(self, contrastive_dim=64, **kwargs):
         super().__init__(**kwargs)
         self.contrastive_dim = contrastive_dim
-        
+
         # Project transformer embeddings into contrastive dimension
         self.contrastive_head = nn.Sequential(
             nn.Linear(self.embedding_dim, self.embedding_dim),
             nn.LayerNorm(self.embedding_dim),
             nn.GELU(),
-            nn.Linear(self.embedding_dim, self.contrastive_dim)
+            nn.Linear(self.embedding_dim, self.contrastive_dim),
         )
 
-    def forward(self, states, actions, returns_to_go, costs_to_go, time_steps, padding_mask=None, episode_cost=None, return_latents=False):
+    def forward(
+        self,
+        states,
+        actions,
+        returns_to_go,
+        costs_to_go,
+        time_steps,
+        padding_mask=None,
+        episode_cost=None,
+        return_latents=False,
+    ):
         batch_size, seq_len = states.shape[0], states.shape[1]
 
         # prepare embeddings
-        seq_list, raw_embs, time_embs = self._prepare_embeddings(states, actions, returns_to_go, costs_to_go, time_steps)
-        
+        seq_list, raw_embs, time_embs = self._prepare_embeddings(
+            states, actions, returns_to_go, costs_to_go, time_steps
+        )
+
         # we only need the time-embedded cost to condition the latents later
-        time_c = time_embs[3] 
-        
+        time_c = time_embs[3]
+
         # pass everything through attention layers FIRST
         transformer_out = self._process_transformer(seq_list, padding_mask, episode_cost, batch_size, seq_len)
 
         # generate predictions
         action_preds, cost_preds, state_preds = self._generate_predictions(transformer_out, time_c)
 
-        # extract state and action embeddings from transformer layers 
+        # extract state and action embeddings from transformer layers
         latents = None
         if return_latents and self.use_cost:
             # transformer_out shape: [Batch, Seq_Len, Modalities, Emb_Dim]
             contextualized_state = transformer_out[:, self.seq_repeat - 2]
             contextualized_action = transformer_out[:, self.seq_repeat - 1]
-            
+
             # final pass back to contrastive head
             latents = self.contrastive_head(contextualized_state + contextualized_action)
 
@@ -188,27 +219,34 @@ class ContrastiveCDTBack(BaseContrastiveCDT):
         return action_preds, cost_preds, state_preds
 
 
-class ContrastiveCDTTrainer(CDTTrainer): 
-    def __init__(self, model, env, contrastive_weight=0.1, temperature=0.1, 
-                 num_buckets=2, cost_boundaries=None, **kwargs):
+class ContrastiveCDTTrainer(CDTTrainer):
+    def __init__(
+        self, model, env, contrastive_weight=0.1, temperature=0.1, num_buckets=2, cost_boundaries=None, **kwargs
+    ):
         # Initialize the parent class (sets up optimizers, schedulers, etc.)
         super().__init__(model, env, **kwargs)
-        
+
         self.contrastive_weight = contrastive_weight
         self.num_buckets = num_buckets
         if cost_boundaries is not None:
             self.cost_boundaries = torch.tensor(cost_boundaries, device=self.device)
         self.ntxent_loss = NTXentLoss(temperature=temperature)
-        
-    def train_one_step(self, states, actions, returns, costs_return, time_steps, mask, episode_cost, costs, is_pretraining=False):
+
+    def train_one_step(
+        self, states, actions, returns, costs_return, time_steps, mask, episode_cost, costs, is_pretraining=False
+    ):
         padding_mask = ~mask.to(torch.bool)
-        
+
         # forward pass through model
         action_preds, cost_preds, state_preds, latents = self.model(
-            states=states, actions=actions, returns_to_go=returns,
-            costs_to_go=costs_return, time_steps=time_steps, 
-            padding_mask=padding_mask, episode_cost=episode_cost, 
-            return_latents=True
+            states=states,
+            actions=actions,
+            returns_to_go=returns,
+            costs_to_go=costs_return,
+            time_steps=time_steps,
+            padding_mask=padding_mask,
+            episode_cost=episode_cost,
+            return_latents=True,
         )
 
         # standard CDT losses
@@ -231,14 +269,14 @@ class ContrastiveCDTTrainer(CDTTrainer):
         # contrastive loss
         if self.cost_boundaries is not None:
             flat_latents = latents[mask > 0]
-        
+
             ep_cost_1d = episode_cost.view(-1)
             traj_labels = torch.bucketize(ep_cost_1d, self.cost_boundaries).long()
 
             seq_len = states.shape[1]
             batch_labels = traj_labels.unsqueeze(1).expand(-1, seq_len)
             flat_labels = batch_labels[mask > 0].long()
-            
+
             # sub-sample to avoid out-of-memory errors
             MAX_SAMPLES = 128
             if flat_latents.shape[0] > MAX_SAMPLES:
@@ -248,34 +286,36 @@ class ContrastiveCDTTrainer(CDTTrainer):
 
             if torch.isnan(flat_latents).any():
                 flat_latents = torch.nan_to_num(flat_latents)
-                
+
             cont_loss = self.ntxent_loss(flat_latents, flat_labels)
         else:
             cont_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
-            flat_labels = torch.tensor([0]) 
-            
+            flat_labels = torch.tensor([0])
+
         # combine CDT and contrastive losses
         if is_pretraining:
-            loss = cont_loss 
+            loss = cont_loss
         else:
-            loss = (act_loss + 
-                    self.cost_weight * cost_loss + 
-                    self.state_weight * state_loss + 
-                    self.contrastive_weight * cont_loss)            
-            
+            loss = (
+                act_loss
+                + self.cost_weight * cost_loss
+                + self.state_weight * state_loss
+                + self.contrastive_weight * cont_loss
+            )
+
         self.optim.zero_grad()
         loss.backward()
-        
+
         if self.clip_grad is not None:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad)
         self.optim.step()
-        
-        if getattr(self, 'stochastic', False):
+
+        if getattr(self, "stochastic", False):
             self.log_temperature_optimizer.zero_grad()
-            temperature_loss = (self.model.temperature() * (entropy - self.model.target_entropy).detach())
+            temperature_loss = self.model.temperature() * (entropy - self.model.target_entropy).detach()
             temperature_loss.backward()
             self.log_temperature_optimizer.step()
-            
+
         self.scheduler.step()
 
         # logging
@@ -287,5 +327,5 @@ class ContrastiveCDTTrainer(CDTTrainer):
             cost_loss=cost_loss.item() if not is_pretraining else 0.0,
             state_loss=state_loss.item() if not is_pretraining else 0.0,
             train_lr=self.scheduler.get_last_lr()[0],
-            num_buckets=len(torch.unique(flat_labels))
+            num_buckets=len(torch.unique(flat_labels)),
         )
