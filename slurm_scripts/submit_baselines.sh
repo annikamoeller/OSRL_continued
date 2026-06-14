@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# 1. Define the exact 5 tasks from the CDT paper
-TASKS=( 
+# ==========================================
+# BASELINE CONFIGURATION: VANILLA CDT
+# ==========================================
+WANDB_PROJECT="Vanilla_CDT_Baselines"
+
+# Define the environments you want to test
+ENVS=(
     "OfflineAntRun-v0" 
     "OfflineCarCircle-v0" 
     "OfflineCarRun-v0" 
@@ -9,70 +14,57 @@ TASKS=(
     "OfflineDroneRun-v0" 
 )
 
-# Define the seeds
-SEEDS=(0 1 2)
+# 3 Seeds for a rigorous control group
+SEEDS=(8 42 123)
 
-# 2. Define the submission template function
-submit_job() {
-    local ENV=$1
-    local SEED=$2
-    
-    # Determine Batch Size: Drone tasks use 4096 in the paper; others use 2048.
-    local BATCH_SIZE=2048
-    if [[ "$ENV" == *"Drone"* ]]; then
-        BATCH_SIZE=4096
-    fi
-    
-    local JOB_NAME="CDT_Base_${ENV}_S${SEED}"
+mkdir -p slurm_logs
 
-    sbatch <<EOF
+# ==========================================
+# SUBMISSION LOOP
+# ==========================================
+for ENV in "${ENVS[@]}"; do
+    for SEED in "${SEEDS[@]}"; do 
+        
+        # Ensure log directory exists for vanilla CDT console output
+        LOG_DIR="logs/stdout_vanilla_cdt"
+        mkdir -p "$LOG_DIR"
+
+        # Set up names to keep things separate from CCDT runs
+        JOB_NAME="cdt_vanilla_${ENV}_s${SEED}"
+        GROUP_NAME="Vanilla_CDT_${ENV}"
+        
+        echo "Submitting Baseline: $JOB_NAME"
+
+        sbatch <<EOF
 #!/bin/bash
-#SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=logs/stdout/${JOB_NAME}_%j.log
-#SBATCH --error=logs/stdout/${JOB_NAME}_%j.err
-#SBATCH --time=10:00:00
-#SBATCH --partition=tue.gpu2.q
-#SBATCH --gpus=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
+#SBATCH --job-name=$JOB_NAME
+#SBATCH --output=${LOG_DIR}/%x_%j.out
+#SBATCH --error=${LOG_DIR}/%x_%j.err
+#SBATCH --partition=tue.gpu1.q,tue.gpu2.q,tue.gpu3.q,mcs.gpu.q
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=24:00:00
 #SBATCH --chdir=/home/20234949/thesis/OSRL_continued
 
-# Load HPC environment
-eval "\$(conda shell.bash hook)"
-conda activate CDT_env 
-
-# Set paths and environment variables
+# Load environment
+source ~/.bashrc
+conda activate CDT_env
 export DSRL_DATASET_DIR="/home/20234949/thesis/datasets"
 export PYTHONPATH="/home/20234949/thesis/OSRL_continued:\$PYTHONPATH"
-export MUJOCO_GL="egl"
 
-# Run the training script 
-# baseline mode: weight 0, 1 bucket, 0 pretrain
-python examples/train/train_ccdt.py \
-    --task "$ENV" \
+# Execute Vanilla CDT Training (Calls the default OSRL training script)
+python examples/train/train_cdt.py \
+    --task $ENV \
     --seed $SEED \
-    --batch_size $BATCH_SIZE \
+    --project $WANDB_PROJECT \
+    --group "$GROUP_NAME" \
+    --eval_every 5000 \
     --device "cuda:0" \
-    --project "OSRL-baselines" \
-    --contrastive_weight 0.0 \
-    --pretrain_steps 0 \
-    --num_buckets 1 \
-
+    --logdir "output_cdt"
 EOF
-    
-    echo "Queued: $JOB_NAME (Batch Size: $BATCH_SIZE)"
-}
 
-# 3. Loop through environments and seeds
-for env in "${TASKS[@]}"; do
-    echo "------------------------------------------------"
-    echo "🚀 Submitting baseline jobs for $env..."
-    echo "------------------------------------------------"
-
-    for seed in "${SEEDS[@]}"; do
-        submit_job "$env" "$seed"
     done
 done
 
-echo ""
-echo "✅ All 15 baseline jobs submitted successfully to tue.gpu2.q!"
+echo "🎉 All Vanilla CDT baseline jobs (3 seeds each) submitted!"

@@ -6,6 +6,7 @@ import traceback
 import gymnasium as gym
 import sys
 import datetime
+import argparse
 
 # --- PATH SETUP ---
 sys.path.insert(0, "/home/20234949/thesis/OSRL_continued")
@@ -17,26 +18,24 @@ from osrl.common.exp_util import load_config_and_model, seed_all
 from osrl.algorithms.ccdt import ContrastiveCDTFront, ContrastiveCDTBack, ContrastiveCDTTrainer
 
 # --- DYNAMIC FOLDER & STATS SETUP ---
-LOG_ROOT = "/home/20234949/thesis/OSRL_continued/logs"
+# Note: LOG_ROOT can be dynamically overwritten at runtime by your monolithic script
+LOG_ROOT = "/home/20234949/thesis/OSRL_continued/output"
 BASE_EVAL_DIR = "examples/eval/eval_suite"
 STATS_CSV = "/home/20234949/thesis/OSRL_continued/dataset_analysis/master_dataset_stats.csv"
 
-# Create a new folder named by the current minute
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
 RUN_DIR = os.path.join(BASE_EVAL_DIR, f"eval_{timestamp}")
 os.makedirs(RUN_DIR, exist_ok=True)
-
-# Standardize the output name inside this specific folder
 OUTPUT_CSV = os.path.join(RUN_DIR, "raw_data.csv")
 
 TARGET_COST_SWEEP = [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]
 NUM_EPISODES = 20 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-def collect_raw_eval_data():
-    results = []
+def collect_raw_eval_data(log_filter):
+    global OUTPUT_CSV  
+    results = [] 
     
-    # 1. Load the Ground Truth Dataset Stats
     if not os.path.exists(STATS_CSV):
         raise FileNotFoundError(f"❌ Missing {STATS_CSV}. Check the absolute path.")
     
@@ -44,17 +43,28 @@ def collect_raw_eval_data():
     stats_df = pd.read_csv(STATS_CSV)
     stats_lookup = stats_df.set_index("Task").to_dict('index')
     
-    search_pattern = os.path.join(LOG_ROOT, "**", "config.yaml")
+    # --- DYNAMIC SEARCH PATTERN ---
+    search_pattern = os.path.join(LOG_ROOT, log_filter, "**", "config.yaml")
     config_files = glob.glob(search_pattern, recursive=True)
     
+    if not config_files:
+        print(f"❌ No config files found matching pattern: {search_pattern}")
+        return
+
     print(f"🔍 Found {len(config_files)} experiments. Starting raw collection...")
+
+    # --- ENHANCED SAVE PROTECTION ---
+    output_dir = os.path.dirname(OUTPUT_CSV)
+    if output_dir and not os.path.exists(output_dir):
+        print(f"📁 Creating missing tracking folder directory path: {output_dir}")
+        os.makedirs(output_dir, exist_ok=True)
 
     for config_path in config_files:
         exp_dir = os.path.dirname(config_path)
         print(f"\n📦 Loading: {exp_dir}")
         
         try:
-            # 2. Load Config & Model Weights
+            # 1. Load Config & Model Weights
             try:
                 cfg, model_weights = load_config_and_model(exp_dir, best=False)
             except:
@@ -62,27 +72,58 @@ def collect_raw_eval_data():
 
             seed_all(cfg["seed"])
         
-            # 3. Environment Setup
+            # 2. Environment Setup
             base_env = gym.make(cfg["task"])
             env = wrap_env(env=base_env, reward_scale=cfg["reward_scale"])
             env = OfflineEnvWrapper(env)
 
-            # 4. Initialize Model 
-            model = ContrastiveCDTBack(
-                state_dim=env.observation_space.shape[0],
-                action_dim=env.action_space.shape[0],
-                max_action=env.action_space.high[0],
-                embedding_dim=cfg["embedding_dim"],
-                contrastive_dim=64, 
-                seq_len=cfg["seq_len"],
-                episode_len=cfg["episode_len"],
-                num_layers=cfg["num_layers"],
-                num_heads=cfg["num_heads"],
-                use_rew=cfg["use_rew"],
-                use_cost=cfg["use_cost"],
-                cost_transform=cfg["cost_transform"],
-                stochastic=cfg.get("stochastic", False),
-            )
+            # 3. Dynamic Architecture Selection & Fallback Patch
+            project_name = cfg.get("project", "")
+            encoder_type = cfg.get("encoder_type", "front").lower() 
+            
+            # FIXED: If evaluating a Vanilla model, safely fall back to the original CDT architecture
+            if "Vanilla" in exp_dir or "Vanilla" in project_name:
+                from osrl.algorithms.cdt import CDT
+                print("  🧠 Detected Architecture: Original Vanilla Linear Baseline CDT")
+                arch_label = "Vanilla"
+                num_buckets = 1
+                
+                model = CDT(
+                    state_dim=env.observation_space.shape[0],
+                    action_dim=env.action_space.shape[0],
+                    max_action=env.action_space.high[0],
+                    embedding_dim=cfg["embedding_dim"],
+                    seq_len=cfg["seq_len"],
+                    episode_len=cfg["episode_len"],
+                    num_layers=cfg["num_layers"],
+                    num_heads=cfg["num_heads"],
+                    use_rew=cfg["use_rew"],
+                    use_cost=cfg["use_cost"],
+                    stochastic=cfg.get("stochastic", False),
+                )
+            else:
+                is_back_encoder = "back" in project_name.lower() or encoder_type == "back"
+                ModelClass = ContrastiveCDTBack if is_back_encoder else ContrastiveCDTFront
+                arch_label = "Back" if is_back_encoder else "Front"
+                num_buckets = cfg.get('num_buckets', 1)
+                print(f"  🧠 Detected Architecture: {arch_label}-Encoder")
+
+                # 4. Initialize CCDT Model 
+                model = ModelClass(
+                    state_dim=env.observation_space.shape[0],
+                    action_dim=env.action_space.shape[0],
+                    max_action=env.action_space.high[0],
+                    embedding_dim=cfg["embedding_dim"],
+                    contrastive_dim=cfg.get("contrastive_dim", 64), 
+                    seq_len=cfg["seq_len"],
+                    episode_len=cfg["episode_len"],
+                    num_layers=cfg["num_layers"],
+                    num_heads=cfg["num_heads"],
+                    use_rew=cfg["use_rew"],
+                    use_cost=cfg["use_cost"],
+                    cost_transform=cfg["cost_transform"],
+                    stochastic=cfg.get("stochastic", False),
+                )
             
             state_dict = model_weights.get("model_state", model_weights.get("model", model_weights))
             model.load_state_dict(state_dict)
@@ -90,26 +131,15 @@ def collect_raw_eval_data():
             
             # 5. Initialize Trainer
             trainer = ContrastiveCDTTrainer(
-                model, 
-                env, 
-                cost_boundaries=None,
-                device=DEVICE,
-                reward_scale=cfg["reward_scale"],
-                cost_scale=cfg["cost_scale"]
+                model, env, cost_boundaries=None, device=DEVICE,
+                reward_scale=cfg["reward_scale"], cost_scale=cfg["cost_scale"]
             )
             
-            # 6. Calculate Target Prompts (The Bulletproof Way)
+            # 6. Calculate Target Prompts
             clean_task_name = cfg["task"].replace("Offline", "").replace("-v0", "")
             match = next((k for k in stats_lookup.keys() if clean_task_name in k), None)
-            
-            if match:
-                dataset_max_reward = stats_lookup[match]["Return_Max"]
-                print(f"  🎯 Exact Match Found! Max Dataset Reward for {clean_task_name}: {dataset_max_reward}")
-            else:
-                print(f"  ⚠️ No exact stats match for {clean_task_name}. Falling back to config.")
-                dataset_max_reward = cfg.get("max_reward", 1000.0)
+            dataset_max_reward = stats_lookup[match]["Return_Max"] if match else cfg.get("max_reward", 1000.0)
                 
-            # Set target to exactly 100% of what the model has actually seen
             target_reward = 1.0 * dataset_max_reward
             
             # 7. The Evaluation Sweep
@@ -122,33 +152,37 @@ def collect_raw_eval_data():
                     target_cost=target_cost * cfg["cost_scale"]
                 )
                 
-                results.append({
+                # Create the data dictionary
+                row_data = {
                     "Task": clean_task_name,
                     "Seed": cfg["seed"],
-                    "Variant": f"CCDT-{cfg.get('num_buckets', 1)}B",
+                    "Architecture": arch_label,               
+                    "Buckets": num_buckets,                   
+                    "Variant": f"{arch_label}-{num_buckets}B" if arch_label != "Vanilla" else "Vanilla",
                     "Target_Cost": target_cost,
                     "Target_Reward": target_reward,
                     "Raw_Eval_Cost": raw_eval_cost,
                     "Raw_Eval_Reward": raw_eval_ret,
                     "Avg_Episode_Length": ep_length
-                })
+                }
+                
+                results.append(row_data)
+                
+                # --- FIXED: SAFE INDEPENDENT SAVE ---
+                write_header = not os.path.exists(OUTPUT_CSV)
+                pd.DataFrame([row_data]).to_csv(OUTPUT_CSV, mode='a', header=write_header, index=False)
                 
         except Exception as e:
             print(f"❌ Error processing {exp_dir}:")
             traceback.print_exc()
 
-    # 8. Save the DataFrame
-    df = pd.DataFrame(results)
-    if not df.empty:
-        df.to_csv(OUTPUT_CSV, index=False)
-        print(f"\n✅ Collection complete! Data saved to: {RUN_DIR}")
-        print(f"👉 To complete the pipeline, run:")
-        print(f"   python examples/eval/plot_eval.py {RUN_DIR}")
-        print(f"   python examples/eval/table_eval.py {RUN_DIR}")
-    else:
-        print("\n⚠️ No data collected.")
-
-    return df
+    print(f"\n✅ Collection complete! Data safely stored in: {OUTPUT_CSV}")
+    return pd.DataFrame(results)
 
 if __name__ == "__main__":
-    collect_raw_eval_data()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log_filter", type=str, default="*_cw*", 
+                        help="Folder pattern in logs/ to search for")
+    args = parser.parse_args()
+    
+    collect_raw_eval_data(args.log_filter)

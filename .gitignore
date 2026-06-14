@@ -19,6 +19,10 @@ datasets/*
 **/fig/**
 **/logs/**
 **/misc/**
+output/*
+output_cdt/*
+dataset_splits/*
+archive/*
 
 *.pth
 
