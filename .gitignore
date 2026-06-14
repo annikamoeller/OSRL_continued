@@ -12,6 +12,9 @@ envs/safety-gym/mujoco200_linux
 
 examples/eval/cluster_eval/*
 datasets/* 
+archive_models/*
+thesis_final_models/*
+examples/eval/eval_suite/**/parts/*
 
 **/figure/**
 **/wandb/**

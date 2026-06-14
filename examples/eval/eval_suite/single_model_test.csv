@@ -1,0 +1,2 @@
+Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,0.0,682.8300170898438,59.05,448.1369533152623,200.0

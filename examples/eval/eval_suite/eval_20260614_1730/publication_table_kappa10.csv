@@ -1,0 +1,10 @@
+Task,Variant,Norm_Reward_mean,Norm_Reward_std,Norm_Cost_mean,Norm_Cost_std
+AntRun,Back-2B,69.5,1.19,0.89,0.21
+AntRun,Back-3B,69.47,2.08,1.0,0.29
+AntRun,Back-5B,70.55,0.67,1.35,0.48
+CarCircle,Back-2B,71.09,1.31,0.93,0.15
+CarCircle,Back-3B,71.75,1.36,0.98,0.28
+CarCircle,Back-5B,71.48,0.46,0.73,0.12
+DroneRun,Back-2B,56.99,1.23,0.13,0.4
+DroneRun,Back-3B,56.38,3.36,1.07,0.59
+DroneRun,Back-5B,56.59,2.29,0.42,0.79
