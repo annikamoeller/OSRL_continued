@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=cdt_array_eval
+#SBATCH --job-name=rl_array_eval
 #SBATCH --output=/home/20234949/thesis/OSRL_continued/slurm_scripts/evaluation_scripts/logs/array_%A_%a.out
 #SBATCH --partition=tue.gpu1.q,tue.gpu2.q,tue.gpu3.q,mcs.gpu.q
 #SBATCH --time=00:30:00
@@ -10,6 +10,8 @@
 
 EXP_FILTER=$1
 RUN_DIR=$2
+MODEL_TYPE=$3
+EVAL_MODE=$4
 
 # Load your cluster configurations safely
 eval "$(conda shell.bash hook)"
@@ -22,4 +24,6 @@ echo "🧬 Array worker active for Task Index: $SLURM_ARRAY_TASK_ID"
 python /home/20234949/thesis/OSRL_continued/slurm_scripts/evaluation_scripts/collect_array.py \
     --log_filter "$EXP_FILTER" \
     --array_idx $SLURM_ARRAY_TASK_ID \
-    --run_dir "$RUN_DIR"
+    --run_dir "$RUN_DIR" \
+    --model_type "$MODEL_TYPE" \
+    --eval_mode "$EVAL_MODE"

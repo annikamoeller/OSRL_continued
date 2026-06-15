@@ -15,6 +15,8 @@ datasets/*
 archive_models/*
 thesis_final_models/*
 examples/eval/eval_suite/**/parts/*
+examples/eval/cluster_eval_sweeps/*
+examples/eval/eval_suite/eval_20260613_1655/
 
 **/figure/**
 **/wandb/**

@@ -3,72 +3,107 @@ import os
 import glob
 import argparse
 import sys
+import pandas as pd
+import traceback
 
 # Ensure repository root is visible to the cluster node
 sys.path.insert(0, "/home/20234949/thesis/OSRL_continued")
 
-# Target your actual script module name
-import examples.eval.eval_suite.collect_eval as base_script
+# Import the modular engines from your newly unified suite
+from examples.eval.eval_suite.eval_suite import (
+    load_ccdt_model,
+    load_vanilla_model,
+    load_dataset_stats,
+    TARGET_COST_SWEEP,
+    TARGET_REWARD_MULTIPLIERS,
+    NUM_EPISODES,
+)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--log_filter", type=str, required=True)
     parser.add_argument("--array_idx", type=int, required=True)
     parser.add_argument("--run_dir", type=str, required=True)
+    parser.add_argument("--model_type", type=str, choices=["ccdt", "vanilla"], required=True)
+    parser.add_argument("--eval_mode", type=str, choices=["cost", "pareto"], required=True)
     args = parser.parse_args()
-    
+
     os.makedirs(args.run_dir, exist_ok=True)
-    
-    # Force the unique parallel worker slice naming format so files don't overwrite
-    base_script.OUTPUT_CSV = os.path.join(args.run_dir, f"part_{args.array_idx}.csv")
-    
-    # --- AUTOMATIC ROOT ROUTING ---
-    if "Vanilla" in args.log_filter:
+    output_csv = os.path.join(args.run_dir, f"part_{args.array_idx}.csv")
+
+    # Route to the correct tracking directory
+    if args.model_type == "vanilla":
         LOG_ROOT = "/home/20234949/thesis/OSRL_continued/output_cdt"
-    elif "cw" in args.log_filter:
-        # 🌟 FIXED: Point contrastive weight runs directly to your clean workspace
-        LOG_ROOT = "/home/20234949/thesis/OSRL_continued/thesis_final_models"
     else:
-        LOG_ROOT = "/home/20234949/thesis/OSRL_continued/output"
-        
-    base_script.LOG_ROOT = LOG_ROOT
-    
+        LOG_ROOT = "/home/20234949/thesis/OSRL_continued/thesis_final_models"
+
     search_pattern = os.path.join(LOG_ROOT, args.log_filter, "**", "config.yaml")
     config_files = sorted(glob.glob(search_pattern, recursive=True))
-    
+
     if not config_files:
         print(f"❌ No models found matching filter {args.log_filter} under path: {LOG_ROOT}")
         sys.exit(1)
-        
+
     if args.array_idx >= len(config_files):
-        print(f"⏩ Array index {args.array_idx} out of bounds ({len(config_files)} files total). Exiting cleanly.")
+        print(f"⏩ Array index {args.array_idx} out of bounds. Exiting cleanly.")
         sys.exit(0)
-        
+
     target_config = config_files[args.array_idx]
-    target_dir = os.path.dirname(target_config)
-    
-    print(f"📌 [Array Worker {args.array_idx}] isolating model run: {os.path.basename(target_dir)}")
-    print(f"📂 Config target: {target_config}")
-    
-    # --- SAFE INTERCEPTOR MONKEY-PATCH ---
-    import glob as global_glob
-    real_glob = global_glob.glob
-    
-    def scoped_glob_patch(pattern, recursive=True):
-        # Only intercept if the base script is specifically hunting down its config file list
-        if "config.yaml" in pattern:
-            return [target_config]
-        # Pass through to the real glob for weight-loading (*.pt) or anything else!
-        return real_glob(pattern, recursive=recursive)
-        
-    global_glob.glob = scoped_glob_patch
-    
-    # Execute evaluation pipeline safely inside your single isolated run
+
+    print(f"📌 [Array Worker {args.array_idx}] Isolating model run: {os.path.basename(os.path.dirname(target_config))}")
+    print(f"🛠️ Mode: {args.model_type.upper()} | Eval: {args.eval_mode.upper()}")
+
     try:
-        base_script.collect_ccdt_eval_data("")
-        print(f"✅ Worker {args.array_idx} successfully generated part_{args.array_idx}.csv")
+        # Load the right model architecture
+        if args.model_type == "vanilla":
+            trainer, cfg, arch, buckets, cw, task_name = load_vanilla_model(target_config)
+            variant_name = "Vanilla Baseline"
+        else:
+            trainer, cfg, arch, buckets, cw, task_name = load_ccdt_model(target_config)
+            variant_name = f"{arch}-{buckets}B"
+
+        stats_lookup = load_dataset_stats()
+        match = next((k for k in stats_lookup.keys() if task_name in k), None)
+        dataset_max_reward = stats_lookup[match]["Return_Max"] if match else 1000.0
+
+        # Define reward matrix based on evaluation mode
+        reward_targets = (
+            [dataset_max_reward]
+            if args.eval_mode == "cost"
+            else [dataset_max_reward * m for m in TARGET_REWARD_MULTIPLIERS]
+        )
+
+        results = []
+        for t_rew in reward_targets:
+            for t_cost in TARGET_COST_SWEEP:
+                print(f"  🚀 Target Cost: {t_cost} | Target Reward: {t_rew:.1f}")
+
+                raw_ret, raw_cost, ep_len = trainer.evaluate(
+                    num_rollouts=NUM_EPISODES,
+                    target_return=t_rew * cfg["reward_scale"],
+                    target_cost=t_cost * cfg["cost_scale"],
+                )
+
+                results.append(
+                    {
+                        "Task": task_name,
+                        "Seed": cfg["seed"],
+                        "Architecture": arch,
+                        "Buckets": buckets,
+                        "Contrastive_Weight": cw,
+                        "Variant": variant_name,
+                        "Target_Cost": t_cost,
+                        "Target_Reward": t_rew,
+                        "Raw_Eval_Cost": raw_cost,
+                        "Raw_Eval_Reward": raw_ret,
+                        "Avg_Episode_Length": ep_len,
+                    }
+                )
+
+        pd.DataFrame(results).to_csv(output_csv, index=False)
+        print(f"✅ Worker {args.array_idx} successfully generated {os.path.basename(output_csv)}")
+
     except Exception as e:
         print(f"❌ Worker {args.array_idx} pipeline execution crash.")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
