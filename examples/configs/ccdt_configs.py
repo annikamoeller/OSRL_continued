@@ -12,5 +12,9 @@ class ContrastiveCDTTrainConfig(CDTTrainConfig):
     eval_every: int = 5000     
     update_steps: int = 100_000          
     encoder_type: str = "back"
+    # Add these three lines to your ContrastiveCDTTrainConfig class:
+    contrastive_type: str = "bucket" # "bucket", "threshold", or "distance"
+    alpha: float = 0.02              # For distance matching
+    cost_threshold: float = 10.0     # For threshold infonce
 
 CCDT_DEFAULT_CONFIG = CDT_DEFAULT_CONFIG

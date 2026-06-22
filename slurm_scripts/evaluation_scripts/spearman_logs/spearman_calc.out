@@ -1,0 +1,60 @@
+
+===== SCANNING RUN: Distance =====
+DEBUG: Searching for all .table.json files in /vast.mnt/home/20234949/thesis/OSRL_continued/wandb/run-20260621_120002-fa39050c-5d4f-48b7-b056-881fe8cc1180
+DEBUG: Found 5 tables. Processing...
+
+--- Processing Table: tsne_data_table_14998_25a4107aaca60a8bbaea.table.json ---
+Spearman Correlation: 0.5197
+
+--- Processing Table: tsne_data_table_19998_707ffe5b3d94de42dd47.table.json ---
+Spearman Correlation: 0.5451
+
+--- Processing Table: tsne_data_table_24998_48334232134ed044d5fe.table.json ---
+Spearman Correlation: 0.4726
+
+--- Processing Table: tsne_data_table_4998_9975ce6e4bfd48f58a1d.table.json ---
+Spearman Correlation: 0.4977
+
+--- Processing Table: tsne_data_table_9998_604cbf51051da432b391.table.json ---
+Spearman Correlation: 0.5747
+
+===== SCANNING RUN: Threshold =====
+DEBUG: Searching for all .table.json files in /vast.mnt/home/20234949/thesis/OSRL_continued/wandb/run-20260621_115813-91cbc88d-bbfb-4519-8bd4-e567363ddf26
+DEBUG: Found 3 tables. Processing...
+
+--- Processing Table: tsne_data_table_14998_e008bc82da83cd17700b.table.json ---
+Spearman Correlation: 0.5767
+
+--- Processing Table: tsne_data_table_4998_c34de06229e89a7e508d.table.json ---
+Spearman Correlation: 0.4813
+
+--- Processing Table: tsne_data_table_9998_2329faa758dd6a3d07b6.table.json ---
+Spearman Correlation: 0.5793
+
+
+==============
+JOB STATISTICS
+==============
+
+JobID             State     AveRSS     MaxRSS 
+------------ ---------- ---------- ---------- 
+5919791       COMPLETED                       
+5919791.bat+  COMPLETED          0          0 
+5919791.ext+  COMPLETED          0          0 
+
+Job ID: 5919791
+Cluster: umbrella
+User/Group: 20234949/umbrella
+State: COMPLETED (exit code 0)
+Nodes: 1
+Cores per node: 4
+CPU Utilized: 00:00:07
+CPU Efficiency: 13.46% of 00:00:52 core-walltime
+Job Wall-clock time: 00:00:13
+Memory Utilized: 0.00 MB (estimated maximum)
+Memory Efficiency: 0.00% of 16.00 GB (16.00 GB/node)
+
+If "OOM Killed" appears in the job output, or if any job step state
+is "OUT_OF_MEMORY", you may have requested too little memory. Please
+see https://supercomputing.tue.nl/documentation/kb/slurm/6/ for more
+information.

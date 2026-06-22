@@ -58,8 +58,18 @@ def train(args: ContrastiveCDTTrainConfig):
 
     # 2. Thesis Naming Convention
     env_short = args.task.split("-")[0].replace("Offline", "")
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")    
-    args.name = f"{env_short}_{args.num_buckets}B_{args.pretrain_steps}Pre_{timestamp}"
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")    
+    
+    # Dynamically name the run based on the contrastive method used
+    if getattr(args, "contrastive_type", "bucket") == "distance":
+        method_str = f"Dist_a{getattr(args, 'alpha', 0.02)}"
+    elif getattr(args, "contrastive_type", "bucket") == "threshold":
+        method_str = f"Thres_c{getattr(args, 'cost_threshold', 10.0)}"
+    else:
+        method_str = f"{args.num_buckets}B"
+        
+    args.name = f"{env_short}_{method_str}_{args.pretrain_steps}Pre_{timestamp}"
+    
     if args.group is None:
         args.group = f"{args.task}-contrastive-experiments"
     if args.logdir is not None:
@@ -79,7 +89,13 @@ def train(args: ContrastiveCDTTrainConfig):
 
     data = env.get_dataset()
     env.set_target_cost(args.cost_limit)
-    cost_boundaries = get_cost_boundaries(data, args.num_buckets)
+    
+    # Only calculate boundaries if we are actually using the bucket method
+    if getattr(args, "contrastive_type", "bucket") == "bucket":
+        cost_boundaries = get_cost_boundaries(data, args.num_buckets)
+    else:
+        cost_boundaries = None
+        print(f"\n🚀 [CCDT Setup] Using {args.contrastive_type.upper()} mapping. Bypassing bucket quantiles.\n")
 
     # Restore data pre-processing filters
     cbins, rbins, max_npb, min_npb = None, None, None, None
@@ -129,7 +145,15 @@ def train(args: ContrastiveCDTTrainConfig):
 
     # 5. Trainer Setup
     trainer = ContrastiveCDTTrainer(
-        model, env, logger=logger, contrastive_weight=args.contrastive_weight,
+        model, env, logger=logger, 
+        
+        # New Modular Arguments
+        contrastive_type=getattr(args, "contrastive_type", "bucket"),
+        alpha=getattr(args, "alpha", 0.02),
+        cost_threshold=getattr(args, "cost_threshold", 10.0),
+        
+        # Original Arguments
+        contrastive_weight=args.contrastive_weight,
         temperature=args.temperature, num_buckets=args.num_buckets,         
         cost_boundaries=cost_boundaries, learning_rate=args.learning_rate,
         weight_decay=args.weight_decay, betas=args.betas, clip_grad=args.clip_grad,
@@ -183,7 +207,8 @@ def train(args: ContrastiveCDTTrainConfig):
 
         # Probing Integration
         if (step + 1) % args.probe_every == 0:
-            evaluate_representations(trainer, trainloader, args.device, step, num_buckets=args.num_buckets)
+            current_method = getattr(args, "contrastive_type")
+            evaluate_representations(trainer, trainloader, args.device, step, num_buckets=args.num_buckets, method_type=current_method, save_dir=args.logdir)
 
         # Evaluation & Saving
         if (step + 1) % args.eval_every == 0 or step == args.update_steps - 1:

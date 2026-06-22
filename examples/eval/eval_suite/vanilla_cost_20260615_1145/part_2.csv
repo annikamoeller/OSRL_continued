@@ -1,0 +1,10 @@
+Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,0.0,534.3099975585938,11.05,384.2704147123696,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,534.3099975585938,8.6,383.1841195659727,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,20.0,534.3099975585938,10.95,378.4933210903155,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,30.0,534.3099975585938,26.75,407.3551530575473,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,40.0,534.3099975585938,31.65,410.4808092926886,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,50.0,534.3099975585938,42.95,423.80470784103903,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,60.0,534.3099975585938,49.8,435.280912442973,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,70.0,534.3099975585938,56.6,435.4853570923736,300.0
+CarCircle,123,Vanilla,Baseline,0.0,Vanilla Baseline,80.0,534.3099975585938,60.4,441.17095619428045,300.0
