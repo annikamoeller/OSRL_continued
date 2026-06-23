@@ -219,25 +219,84 @@ class ContrastiveCDTBack(BaseContrastiveCDT):
         return action_preds, cost_preds, state_preds
 
 
+from typing import Optional, Tuple
+import torch
+import torch.nn.functional as F
+from pytorch_metric_learning.losses import NTXentLoss
+from osrl.algorithms.cdt import CDTTrainer
+
 class ContrastiveCDTTrainer(CDTTrainer):
     def __init__(
-        self, model, env, contrastive_weight=0.1, temperature=0.1, num_buckets=2, cost_boundaries=None, **kwargs
+        self, 
+        model, 
+        env, 
+        contrastive_weight=0.1, 
+        contrastive_type="distance", # Options: "bucket", "threshold", "distance", "none"
+        alpha=0.02,                  # Scales max cost diff (150) to latent hypersphere (2.0)
+        temperature=0.1, 
+        cost_threshold=10.0,
+        num_buckets=2, 
+        cost_boundaries=None, 
+        **kwargs
     ):
-        # Initialize the parent class (sets up optimizers, schedulers, etc.)
         super().__init__(model, env, **kwargs)
-
         self.contrastive_weight = contrastive_weight
+        self.contrastive_type = contrastive_type
+        
+        # Continuous Distance params
+        self.alpha = alpha
+        
+        # Threshold params
+        self.cost_threshold = cost_threshold
+        self.temperature = temperature
+        
+        # Bucket params
         self.num_buckets = num_buckets
         if cost_boundaries is not None:
             self.cost_boundaries = torch.tensor(cost_boundaries, device=self.device)
         self.ntxent_loss = NTXentLoss(temperature=temperature)
+
+    def compute_threshold_infonce(self, latents, costs):
+        # Ensure costs match latent precision (Float32)
+        costs = costs.to(latents.dtype)
+        
+        latents = F.normalize(latents, p=2, dim=1)
+        sim_matrix = torch.matmul(latents, latents.T) / self.temperature
+        
+        cost_diff = torch.abs(costs.unsqueeze(1) - costs.unsqueeze(0))
+        pos_mask = (cost_diff <= self.cost_threshold).float()
+        
+        mask_diag = torch.eye(latents.shape[0], device=self.device)
+        pos_mask = pos_mask - mask_diag
+        
+        exp_sim = torch.exp(sim_matrix) * (1 - mask_diag)
+        denom = exp_sim.sum(dim=1, keepdim=True)
+        log_prob = sim_matrix - torch.log(denom + 1e-8)
+        
+        pos_counts = pos_mask.sum(dim=1)
+        valid = (pos_counts > 0)
+        
+        if not valid.any():
+            return torch.tensor(0.0, device=self.device, dtype=latents.dtype, requires_grad=True)
+            
+        return -((pos_mask * log_prob).sum(dim=1)[valid] / pos_counts[valid]).mean()
+
+    def compute_distance_matching(self, latents, costs):
+        # Ensure costs match latent precision (Float32)
+        costs = costs.to(latents.dtype)
+        
+        latents = F.normalize(latents, p=2, dim=1)
+        latent_dist = torch.cdist(latents, latents, p=2)
+        cost_dist = torch.abs(costs.unsqueeze(1) - costs.unsqueeze(0))
+        
+        return F.mse_loss(latent_dist, self.alpha * cost_dist)
 
     def train_one_step(
         self, states, actions, returns, costs_return, time_steps, mask, episode_cost, costs, is_pretraining=False
     ):
         padding_mask = ~mask.to(torch.bool)
 
-        # forward pass through model
+        # 1. Forward pass through model
         action_preds, cost_preds, state_preds, latents = self.model(
             states=states,
             actions=actions,
@@ -249,7 +308,7 @@ class ContrastiveCDTTrainer(CDTTrainer):
             return_latents=True,
         )
 
-        # standard CDT losses
+        # 2. Standard CDT losses
         if self.stochastic:
             log_likelihood = action_preds.log_prob(actions)[mask > 0].mean()
             entropy = action_preds.entropy()[mask > 0].mean()
@@ -266,33 +325,40 @@ class ContrastiveCDTTrainer(CDTTrainer):
         state_loss = F.mse_loss(state_preds[:, :-1], states[:, 1:].detach(), reduction="none")
         state_loss = (state_loss * mask[:, :-1].unsqueeze(-1)).mean()
 
-        # contrastive loss
-        if self.cost_boundaries is not None:
+        # 3. Contrastive Loss Routing
+        if self.contrastive_type != "none":
             flat_latents = latents[mask > 0]
 
+            # Map episode costs to every valid step in the sequence
             ep_cost_1d = episode_cost.view(-1)
-            traj_labels = torch.bucketize(ep_cost_1d, self.cost_boundaries).long()
-
             seq_len = states.shape[1]
-            batch_labels = traj_labels.unsqueeze(1).expand(-1, seq_len)
-            flat_labels = batch_labels[mask > 0].long()
+            batch_costs = ep_cost_1d.unsqueeze(1).expand(-1, seq_len)
+            flat_costs = batch_costs[mask > 0]
 
-            # sub-sample to avoid out-of-memory errors
+            # Sub-sample to avoid out-of-memory errors on the cluster
             MAX_SAMPLES = 128
             if flat_latents.shape[0] > MAX_SAMPLES:
                 idx = torch.randperm(flat_latents.shape[0], device=self.device)[:MAX_SAMPLES]
                 flat_latents = flat_latents[idx]
-                flat_labels = flat_labels[idx]
+                flat_costs = flat_costs[idx]
 
             if torch.isnan(flat_latents).any():
                 flat_latents = torch.nan_to_num(flat_latents)
 
-            cont_loss = self.ntxent_loss(flat_latents, flat_labels)
+            # Calculate the specific loss
+            if self.contrastive_type == "bucket" and getattr(self, "cost_boundaries", None) is not None:
+                flat_labels = torch.bucketize(flat_costs, self.cost_boundaries).long()
+                cont_loss = self.ntxent_loss(flat_latents, flat_labels)
+            elif self.contrastive_type == "threshold":
+                cont_loss = self.compute_threshold_infonce(flat_latents, flat_costs)
+            elif self.contrastive_type == "distance":
+                cont_loss = self.compute_distance_matching(flat_latents, flat_costs)
+            else:
+                cont_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
         else:
             cont_loss = torch.tensor(0.0, device=self.device, requires_grad=True)
-            flat_labels = torch.tensor([0])
 
-        # combine CDT and contrastive losses
+        # 4. Combine and Backpropagate
         if is_pretraining:
             loss = cont_loss
         else:
@@ -318,7 +384,7 @@ class ContrastiveCDTTrainer(CDTTrainer):
 
         self.scheduler.step()
 
-        # logging
+        # 5. Logging
         self.logger.store(
             tab="train",
             total_loss=loss.item(),
@@ -326,6 +392,5 @@ class ContrastiveCDTTrainer(CDTTrainer):
             act_loss=act_loss.item() if not is_pretraining else 0.0,
             cost_loss=cost_loss.item() if not is_pretraining else 0.0,
             state_loss=state_loss.item() if not is_pretraining else 0.0,
-            train_lr=self.scheduler.get_last_lr()[0],
-            num_buckets=len(torch.unique(flat_labels)),
+            train_lr=self.scheduler.get_last_lr()[0]
         )

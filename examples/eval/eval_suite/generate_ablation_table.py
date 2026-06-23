@@ -105,23 +105,39 @@ if __name__ == "__main__":
     parser.add_argument(
         "--vanilla_path",
         type=str,
+<<<<<<< HEAD
         default="/Users/annikamollerchandiramani/Documents/uni/OSRL_continued/examples/eval/eval_suite/eval_vanilla_cdt/raw_vanilla_data.csv",
+=======
+        default="examples/eval/eval_suite/eval_vanilla_cdt/raw_vanilla_data.csv",
+>>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
         help="Path to the Vanilla CDT CSV",
     )
     parser.add_argument(
         "--ablation_path",
         type=str,
+<<<<<<< HEAD
         default="/Users/annikamollerchandiramani/Documents/uni/OSRL_continued/examples/eval/eval_suite/vanilla_csv_results_ccdt/raw_data.csv",
+=======
+        default="examples/eval/eval_suite/vanilla_csv_results_ccdt/raw_data.csv",
+>>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
         help="Path to the CCDT Ablation CSV",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
+<<<<<<< HEAD
         default="/Users/annikamollerchandiramani/Documents/uni/OSRL_continued/examples/eval/eval_suite",
+=======
+        default="examples/eval/eval_suite",
+>>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
         help="Directory to save the CSV table",
     )
     parser.add_argument("--target_cost", type=float, default=10.0, help="The Target Cost (kappa) to filter for")
 
     args = parser.parse_args()
 
+<<<<<<< HEAD
     generate_combined_publication_table(args.vanilla_path, args.ablation_path, args.output_dir, args.target_cost)
+=======
+    generate_combined_publication_table(args.vanilla_path, args.ablation_path, args.output_dir, args.target_cost)
+>>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d

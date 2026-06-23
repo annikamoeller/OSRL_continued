@@ -9,9 +9,7 @@ ARCHS=("front" "back")
 ENVS=(
     "OfflineAntRun-v0" 
     "OfflineCarCircle-v0" 
-    # "OfflineCarRun-v0" 
     "OfflineDroneCircle-v0" 
-    # "OfflineDroneRun-v0" 
 )
 
 

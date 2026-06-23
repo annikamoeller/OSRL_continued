@@ -49,15 +49,20 @@ ARRAY_OUT=$(sbatch -p "$PARTITIONS" --array=0-${MAX_IDX}%30 \
     ${REPO_ROOT}/slurm_scripts/evaluation_scripts/submit_array_eval.sh \
     "$LOG_FILTER" "$RUN_DIR" "$MODEL_TYPE" "$EVAL_MODE")
     
-MASTER_JOB_ID=$(echo "$ARRAY_OUT" | grep -o '[0-9]*')
+MASTER_JOB_ID=$(echo "$ARRAY_OUT" | awk '{print $NF}')
 echo "🧬 Slurm Master Array Job dispatched with ID: $MASTER_JOB_ID"
 
 # 6. Post-Processing Aggregator
 mkdir -p "${REPO_ROOT}/slurm_scripts/evaluation_scripts/logs"
 
-sbatch -p "$PARTITIONS" --dependency=afterok:${MASTER_JOB_ID} --job-name=rl_post_process \
+sbatch -p "$PARTITIONS" --dependency=afterany:${MASTER_JOB_ID} --job-name=rl_post_process \
        --output=${REPO_ROOT}/slurm_scripts/evaluation_scripts/logs/post_process_%j.out \
        --time=00:15:00 --cpus-per-task=1 --mem=4G --wrap="
+          # Initialize environment inside the new compute node
+          eval \"\$(conda shell.bash hook)\"
+          conda activate CDT_env
+          export PYTHONPATH=\$PYTHONPATH:${REPO_ROOT}
+          
           cd ${REPO_ROOT}
           
           # Consolidated Pandas merger
