@@ -15,10 +15,10 @@ datasets/*
 archive_models/*
 thesis_final_models/*
 examples/eval/eval_suite/**/parts/*
-examples/eval/cluster_eval_sweeps/*
 examples/eval/eval_suite/eval_20260613_1655/
 arch_b_c/
 models/
+examples/eval/cluster_eval_sweeps/**/images/
 
 **/figure/**
 **/wandb/**
