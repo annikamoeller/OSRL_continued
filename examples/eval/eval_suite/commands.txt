@@ -1,0 +1,4 @@
+plot the cost weight vs adherence: 
+python3 examples/eval/eval_suite/plot_phase1_adherence.py --ccdt_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/ccdt_cost_20260619_1944/raw_data.csv --vanilla_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/vanilla_cost_sweep_20260623_1621/raw_data.csv --out_dir examples/eval/eval_suite/plots/phase1_plots
+
+plot the cost weight vs silhouette score:
