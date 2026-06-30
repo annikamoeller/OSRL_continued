@@ -1,6 +1,6 @@
-Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+Task,Seed,Architecture,Buckets,CW,Variant,Target_Cost,Target_Reward,Eval_Cost,Eval_Reward,Avg_Episode_Length
 DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,0.0,682.8300170898438,0.0,392.3165527053722,200.0
-DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,682.8300170898438,0.15,406.67677001900284,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,682.8300170898438,0.15,406.6767700190029,200.0
 DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,20.0,682.8300170898438,0.0,399.3716692339628,200.0
 DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,30.0,682.8300170898438,3.45,407.9059906562536,200.0
 DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,40.0,682.8300170898438,51.5,424.44194114779646,200.0

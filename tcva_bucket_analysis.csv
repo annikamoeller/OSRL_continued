@@ -1,0 +1,4 @@
+Task,Architecture,Buckets,CW,TCVA
+AntRun,Vanilla,Baseline,0.0,36.875
+CarCircle,Vanilla,Baseline,0.0,60.87500000000001
+DroneRun,Vanilla,Baseline,0.0,261.25

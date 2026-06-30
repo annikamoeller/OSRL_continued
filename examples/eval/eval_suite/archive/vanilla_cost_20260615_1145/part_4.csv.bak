@@ -1,0 +1,10 @@
+Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,0.0,682.8300170898438,0.0,392.3165527053722,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,682.8300170898438,0.15,406.67677001900284,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,20.0,682.8300170898438,0.0,399.3716692339628,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,30.0,682.8300170898438,3.45,407.9059906562536,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,40.0,682.8300170898438,51.5,424.44194114779646,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,50.0,682.8300170898438,63.25,447.8603478045808,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,60.0,682.8300170898438,59.95,447.8763667304004,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,70.0,682.8300170898438,53.75,445.9388593390773,200.0
+DroneRun,123,Vanilla,Baseline,0.0,Vanilla Baseline,80.0,682.8300170898438,52.25,446.2172135786845,200.0

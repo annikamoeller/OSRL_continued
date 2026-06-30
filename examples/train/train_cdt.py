@@ -56,8 +56,16 @@ def train(args: CDTTrainConfig):
         env = gym.make(args.task)
 
     # pre-process offline dataset
-    data = env.get_dataset()
-    env.set_target_cost(args.cost_limit)
+    if args.dataset is not None:
+        import h5py
+        print(f"🔥 Loading CUSTOM skewed dataset from: {args.dataset}")
+        with h5py.File(args.dataset, 'r') as f:
+            data = {k: f[k][:] for k in f.keys()}
+    else:
+        print("🌍 Loading default DSRL dataset...")
+        data = env.get_dataset()
+        
+    env.set_target_cost(args.cost_limit)   
 
     cbins, rbins, max_npb, min_npb = None, None, None, None
     if args.density != 1.0:

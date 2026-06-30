@@ -5,22 +5,10 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
-=======
-import matplotlib
-matplotlib.use('Agg') 
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
 import seaborn as sns
 from sklearn.manifold import TSNE
 import gymnasium as gym
 import yaml
-<<<<<<< HEAD
-=======
-import glob
-import random
-import argparse
-import umap
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
 
 # --- PATH SETUP ---
 PROJECT_ROOT = "/home/20234949/thesis/OSRL_continued"
@@ -28,428 +16,264 @@ sys.path.insert(0, PROJECT_ROOT)
 
 import bullet_safety_gym  # noqa
 from dsrl.offline_env import OfflineEnvWrapper, wrap_env
-<<<<<<< HEAD
-from osrl.common.exp_util import load_config_and_model, seed_all
 from osrl.algorithms.ccdt import ContrastiveCDTBack
 from osrl.algorithms.cdt import CDT
 
-# --- CONFIGURATION (UPDATE THESE PATHS TO YOUR BEST MODELS) ---
-# Pick ONE specific AntRun environment model for both to make it a fair comparison
-VANILLA_CONFIG_PATH = os.path.join(PROJECT_ROOT, "output_cdt/Vanilla_CDT_OfflineAntRun-v0/checkpoint/config.yaml")
-CCDT_CONFIG_PATH = os.path.join(
-    PROJECT_ROOT, "thesis_final_models/Back_OfflineAntRun-v0_2Buckets_cw04/checkpoint/config.yaml"
-)
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-# 1. THE WIRETAP (PYTORCH HOOK)
-# We use a global list to store the hidden states as the model thinks.
+EXPERIMENTS = {
+    "AntRun": {
+        "Baseline": "models/cdt/Vanilla_CDT_OfflineAntRun-v0/CDT_eval_every5000_seed8-205d/CDT_eval_every5000_seed8-205d/config.yaml",
+        "CCDT_2B":  "models/ccdt_buckets/Back_OfflineAntRun-v0_2Buckets_cw03/AntRun_2B_0Pre_20260607_062913_205876/AntRun_2B_0Pre_20260607_062913_205876/config.yaml",
+        "CCDT_3B":  "models/ccdt_buckets/Back_OfflineAntRun-v0_3Buckets_cw03/AntRun_3B_0Pre_20260607_123813_292781/AntRun_3B_0Pre_20260607_123813_292781/config.yaml",
+        "CCDT_5B":  "models/ccdt_buckets/Back_OfflineAntRun-v0_5Buckets_cw03/AntRun_5B_0Pre_20260607_180349_176723/AntRun_5B_0Pre_20260607_180349_176723/config.yaml",
+    },
+    "CarCircle": {
+        "Baseline": "models/cdt/Vanilla_CDT_OfflineCarCircle-v0/CDT_eval_every5000_seed8-4818/CDT_eval_every5000_seed8-4818/config.yaml",
+        "CCDT_2B":  "models/ccdt_buckets/Back_OfflineCarCircle-v0_2Buckets_cw03/CarCircle_2B_0Pre_20260608_043629_697766/CarCircle_2B_0Pre_20260608_043629_697766/config.yaml",
+        "CCDT_3B":  "models/ccdt_buckets/Back_OfflineCarCircle-v0_3Buckets_cw03/CarCircle_3B_0Pre_20260608_080821_878539/CarCircle_3B_0Pre_20260608_080821_878539/config.yaml",
+        "CCDT_5B":  "models/ccdt_buckets/Back_OfflineCarCircle-v0_5Buckets_cw03/CarCircle_5B_0Pre_20260611_152557_434367/CarCircle_5B_0Pre_20260611_152557_434367/config.yaml",
+    },
+    "DroneRun": {
+        "Baseline": "models/cdt/Vanilla_CDT_OfflineDroneRun-v0/CDT_eval_every5000_seed8-ca68/CDT_eval_every5000_seed8-ca68/config.yaml",
+        "CCDT_2B":  "models/ccdt_buckets/Back_OfflineDroneRun-v0_2Buckets_cw03/DroneRun_2B_0Pre_20260608_184340_151194/DroneRun_2B_0Pre_20260608_184340_151194/config.yaml",
+        "CCDT_3B":  "models/ccdt_buckets/Back_OfflineDroneRun-v0_3Buckets_cw03/DroneRun_3B_0Pre_20260608_223145_325235/DroneRun_3B_0Pre_20260608_223145_325235/config.yaml",
+        "CCDT_5B":  "models/ccdt_buckets/Back_OfflineDroneRun-v0_5Buckets_cw03/DroneRun_5B_0Pre_20260611_183416_814721/DroneRun_5B_0Pre_20260611_183416_814721/config.yaml",
+    }
+}
+
+# EXPERIMENTS = {
+#     "AntRun": {
+#         "Baseline": "models/cdt/Vanilla_CDT_OfflineAntRun-v0/CDT_eval_every5000_seed8-205d/CDT_eval_every5000_seed8-205d/config.yaml",
+#         "Distance":  "models/ccdt_distance/AntRun_Dist_a0.02_0Pre_20260622_181550/AntRun_Dist_a0.02_0Pre_20260622_181550/config.yaml",
+#     },
+#     "CarCircle": {
+#         "Baseline": "models/cdt/Vanilla_CDT_OfflineCarCircle-v0/CDT_eval_every5000_seed8-4818/CDT_eval_every5000_seed8-4818/config.yaml",
+#         "Distance":  "models/ccdt_distance/CarCircle_Dist_a0.02_0Pre_20260622_164159/CarCircle_Dist_a0.02_0Pre_20260622_164159/config.yaml",
+#     },
+#     "DroneRun": {
+#         "Baseline": "models/cdt/Vanilla_CDT_OfflineDroneRun-v0/CDT_eval_every5000_seed8-ca68/CDT_eval_every5000_seed8-ca68/config.yaml",
+#         "Distance":  "models/ccdt_distance/DroneRun_Dist_a0.02_0Pre_20260622_194357/DroneRun_Dist_a0.02_0Pre_20260622_194357/config.yaml",
+#     }
+# }
+
+
+ROW_ORDER = ["Baseline", "CCDT_2B", "CCDT_3B", "CCDT_5B"]
+ROW_LABELS = ["Vanilla CDT\n(Baseline)", "CCDT (cw=0.3)\n2 Buckets", "CCDT (cw=0.3)\n3 Buckets", "CCDT (cw=0.3)\n5 Buckets"]
+# ROW_ORDER = ["Baseline", "Distance"]
+# ROW_LABELS = ["Baseline", "Distance"]
+ENV_ORDER = list(EXPERIMENTS.keys())
+
+# 1. WIRETAP
 hidden_states_buffer = []
 
-
 def hidden_state_hook(module, inp, out):
-    """Intercepts the input to the action head (the final Transformer representation)."""
     hidden = inp[0].detach().cpu()
-    # Sequence models output [Batch, Seq_Len, Hidden_Dim]. We only want the current timestep (-1).
     if hidden.dim() == 3:
         hidden = hidden[:, -1, :]
-    elif hidden.dim() == 2:
-        pass  # Already flat
     hidden_states_buffer.append(hidden.numpy())
 
-
-# 2. MODEL LOADING & HOOK ATTACHMENT
+# 2. MODEL LOADING
 def load_and_hook_model(config_path, is_vanilla=True):
-    exp_dir = os.path.dirname(os.path.dirname(config_path))
-    with open(config_path, "r") as f:
-        cfg = yaml.safe_load(f)
-
-    # Load weights
-=======
-from osrl.common.exp_util import load_config_and_model
-from osrl.algorithms.cdt import CDT
-from osrl.algorithms.ccdt import ContrastiveCDTBack
-
-DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-# --- CORE FUNCTIONS ---
-def resolve_config_path(env_name, model_type):
-    if model_type == "vanilla":
-        pattern = os.path.join(PROJECT_ROOT, f"models/cdt//Vanilla_CDT_Offline{env_name}-v0/**/config.yaml")
-    elif model_type == "ccdt":
-        pattern = os.path.join(PROJECT_ROOT, f"models/ccdt_arch_a/Back_Offline{env_name}-v0_3Buckets_cw03/**/config.yaml")
-    else:
-        raise ValueError(f"Unknown model type: {model_type}")
-
-    matches = glob.glob(pattern, recursive=True)
-    if not matches:
-        raise FileNotFoundError(f"❌ Could not find config for {model_type} {env_name} matching: {pattern}")
-    return matches[0]
-
-hidden_states_buffer = []
-
-def hidden_state_hook(module, inp, out):
-    hidden = inp[0].detach().cpu()
-    if hidden.dim() == 3:
-        hidden = hidden[:, -1, :] 
-    hidden_states_buffer.append(hidden.numpy())
-
-def load_evaluation_model(config_path, model_type):
+    config_path = os.path.abspath(os.path.join(PROJECT_ROOT, config_path))
     exp_dir = os.path.dirname(config_path)
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config not found: {config_path}")
+        
     with open(config_path, "r") as f:
-        cfg = yaml.unsafe_load(f)
+        cfg = yaml.full_load(f)
 
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
-    try:
-        _, model_weights = load_config_and_model(exp_dir, best=False)
-    except:
-        _, model_weights = load_config_and_model(exp_dir, best=True)
+    for p in ["checkpoint/model.pt", "checkpoint/model_best.pt", "model.pt", "model_best.pt"]:
+        full_p = os.path.join(exp_dir, p)
+        if os.path.exists(full_p):
+            model_weights = torch.load(full_p, map_location=DEVICE)
+            break
 
     base_env = gym.make(cfg["task"])
     env = wrap_env(env=base_env, reward_scale=cfg["reward_scale"])
     env = OfflineEnvWrapper(env)
 
-<<<<<<< HEAD
-    # Init architectures
+    model_class = CDT if is_vanilla else ContrastiveCDTBack
+    kwargs = {
+        "state_dim": env.observation_space.shape[0], "action_dim": env.action_space.shape[0],
+        "max_action": env.action_space.high[0], "embedding_dim": cfg["embedding_dim"],
+        "seq_len": cfg["seq_len"], "episode_len": cfg["episode_len"], "num_layers": cfg["num_layers"],
+        "num_heads": cfg["num_heads"], "use_rew": cfg["use_rew"], "use_cost": cfg["use_cost"],
+        "cost_transform": cfg["cost_transform"], "stochastic": cfg.get("stochastic", True)
+    }
     if is_vanilla:
-=======
-    if model_type == "vanilla":
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
-        model = CDT(
-            state_dim=env.observation_space.shape[0],
-            action_dim=env.action_space.shape[0],
-            max_action=env.action_space.high[0],
-            embedding_dim=cfg["embedding_dim"],
-            seq_len=cfg["seq_len"],
-            episode_len=cfg["episode_len"],
-            num_layers=cfg["num_layers"],
-            num_heads=cfg["num_heads"],
-            time_emb=cfg["time_emb"],
-            use_rew=cfg["use_rew"],
-            use_cost=cfg["use_cost"],
-            cost_transform=cfg["cost_transform"],
-            target_entropy=-env.action_space.shape[0],
-<<<<<<< HEAD
-=======
-            stochastic=cfg.get("stochastic", True), 
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
-        )
+        kwargs.update({"time_emb": cfg["time_emb"], "target_entropy": -env.action_space.shape[0]})
     else:
-        model = ContrastiveCDTBack(
-            state_dim=env.observation_space.shape[0],
-            action_dim=env.action_space.shape[0],
-            max_action=env.action_space.high[0],
-            embedding_dim=cfg["embedding_dim"],
-            contrastive_dim=cfg.get("contrastive_dim", 64),
-            seq_len=cfg["seq_len"],
-            episode_len=cfg["episode_len"],
-            num_layers=cfg["num_layers"],
-            num_heads=cfg["num_heads"],
-            use_rew=cfg["use_rew"],
-            use_cost=cfg["use_cost"],
-            cost_transform=cfg["cost_transform"],
-<<<<<<< HEAD
-=======
-            stochastic=cfg.get("stochastic", True), 
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
-        )
+        kwargs.update({"contrastive_dim": cfg.get("contrastive_dim", 64)})
 
+    model = model_class(**kwargs)
     state_dict = model_weights.get("model_state", model_weights.get("model", model_weights))
     model.load_state_dict(state_dict)
     model.to(DEVICE)
     model.eval()
 
-<<<<<<< HEAD
-    # 🚨 ATTACH THE HOOK 🚨
-    # We target the final linear layer that predicts the action.
-    # The exact name depends on the OSRL implementation, usually `predict_action` or `action_head`
-    hook_handle = None
+    hook_attached = False
     for name, module in model.named_modules():
         if "predict_action" in name or "action_head" in name:
-            hook_handle = module.register_forward_hook(hidden_state_hook)
-            print(f"  📎 Hook successfully attached to: {name}")
+            module.register_forward_hook(hidden_state_hook)
+            hook_attached = True
             break
-
-    if hook_handle is None:
-        print("  ⚠️ Warning: Could not find action head to hook. Falling back to base module.")
+    if not hook_attached:
         model.register_forward_hook(hidden_state_hook)
 
     return model, env, cfg
 
-
-# 3. DATA COLLECTION LOOP
-def collect_embeddings(model, env, cfg, target_cost_list, num_steps=200):
-    global hidden_states_buffer
-    hidden_states_buffer = []  # Clear buffer
-    labels = []
-
-    # We will run the model manually to control exactly when we capture data
-    for t_cost in target_cost_list:
-        state, info = env.reset()
-
-        # Initialize context buffers
-        states = torch.zeros(
-            (1, cfg["episode_len"] + 1, env.observation_space.shape[0]), dtype=torch.float32, device=DEVICE
-        )
-        actions = torch.zeros((1, cfg["episode_len"], env.action_space.shape[0]), dtype=torch.float32, device=DEVICE)
-        rewards = torch.zeros((1, cfg["episode_len"], 1), dtype=torch.float32, device=DEVICE)
-        costs = torch.zeros((1, cfg["episode_len"], 1), dtype=torch.float32, device=DEVICE)
-
-        ep_return = target_reward = 800.0 * cfg["reward_scale"]  # High reward prompt
-        ep_cost = t_cost * cfg["cost_scale"]
-
-        states[0, 0] = torch.tensor(state, device=DEVICE)
-
-        for step in range(num_steps):
-            # Pad sequences for the transformer
-            seq_start = max(0, step + 1 - cfg["seq_len"])
-            s_seq = states[:, seq_start : step + 1]
-            a_seq = actions[:, seq_start : step + 1]
-            r_seq = rewards[:, seq_start : step + 1]
-            c_seq = costs[:, seq_start : step + 1]
-
-            with torch.no_grad():
-                # This forward pass triggers our wiretap hook!
-                if hasattr(model, "get_action"):
-                    # Call the wrapper if it exists
-                    action = model.get_action(s_seq, a_seq, r_seq, c_seq)
-                else:
-                    # Direct forward pass
-                    out = model(s_seq, a_seq, r_seq, c_seq)
-                    action = out[0] if isinstance(out, tuple) else out
-
-            # We record whether the model was *told* to be safe or unsafe
-            label = "Safe Trajectory (Cost=0)" if t_cost == 0.0 else "Unsafe Trajectory (Cost=80)"
-            labels.append(label)
-
-            # Step environment (we don't strictly care about the physical outcome, just the mental state)
-            state, reward, terminated, truncated, info = env.step(
-                action[0, -1].cpu().numpy() if action.dim() == 3 else action.cpu().numpy()
-            )
-            if terminated or truncated:
-                break
-
-            states[0, step + 1] = torch.tensor(state, device=DEVICE)
-            actions[0, step] = torch.tensor(action[0, -1] if action.dim() == 3 else action, device=DEVICE)
-
-    # Flatten the collected buffer
-    embeddings = np.concatenate(hidden_states_buffer, axis=0)
-    return embeddings, labels
-
-
-# 4. EXECUTION AND VISUALIZATION
-if __name__ == "__main__":
-    print("🚀 Extracting representations for Thesis Motivation Plot...")
-
-    # 1. Vanilla Extraction
-    print("\n🧠 Processing Vanilla CDT...")
-    v_model, v_env, v_cfg = load_and_hook_model(VANILLA_CONFIG_PATH, is_vanilla=True)
-    v_embeddings, v_labels = collect_embeddings(v_model, v_env, v_cfg, target_cost_list=[0.0, 80.0])
-
-    # 2. CCDT Extraction
-    print("\n🧠 Processing Contrastive CCDT...")
-    c_model, c_env, c_cfg = load_and_hook_model(CCDT_CONFIG_PATH, is_vanilla=False)
-    c_embeddings, c_labels = collect_embeddings(c_model, c_env, c_cfg, target_cost_list=[0.0, 80.0])
-
-    # 3. Dimensionality Reduction (t-SNE)
-    print("\n🌌 Crushing high-dimensional thoughts to 2D using t-SNE...")
-    tsne = TSNE(n_components=2, perplexity=30, random_state=42, init="pca", learning_rate="auto")
-
-    v_tsne = tsne.fit_transform(v_embeddings)
-    c_tsne = tsne.fit_transform(c_embeddings)
-
-    # Format into dataframes
-    df_v = pd.DataFrame({"x": v_tsne[:, 0], "y": v_tsne[:, 1], "Condition": v_labels, "Model": "Vanilla CDT"})
-    df_c = pd.DataFrame({"x": c_tsne[:, 0], "y": c_tsne[:, 1], "Condition": c_labels, "Model": "Contrastive CDT"})
-    df_plot = pd.concat([df_v, df_c])
-
-    # 4. Plot the results
-    print("🎨 Rendering thesis graphics...")
-    sns.set_theme(style="white", font_scale=1.2)
-    plt.rcParams.update({"font.family": "serif"})
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=False, sharey=False)
-
-    palette = {"Safe Trajectory (Cost=0)": "#2ecc71", "Unsafe Trajectory (Cost=80)": "#e74c3c"}
-
-    # Plot Vanilla Hairball
-    sns.scatterplot(
-        ax=axes[0], data=df_v, x="x", y="y", hue="Condition", palette=palette, s=60, alpha=0.7, edgecolor=None
-    )
-    axes[0].set_title("Vanilla CDT Latent Space\n(Representational Collapse)", fontweight="bold")
-    axes[0].set_xlabel("t-SNE Dim 1")
-    axes[0].set_ylabel("t-SNE Dim 2")
-    axes[0].get_legend().remove()
-
-    # Plot CCDT Split
-    sns.scatterplot(
-        ax=axes[1], data=df_c, x="x", y="y", hue="Condition", palette=palette, s=60, alpha=0.7, edgecolor=None
-    )
-    axes[1].set_title("Contrastive CDT Latent Space\n(Structured Safety Manifold)", fontweight="bold")
-    axes[1].set_xlabel("t-SNE Dim 1")
-    axes[1].set_ylabel("")
-    axes[1].legend(title="Prompted Behavior", bbox_to_anchor=(1.05, 1), loc="upper left")
-
-    # Clean up axes
-    for ax in axes:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_color("#bdc3c7")
-
-    plt.tight_layout()
-    out_path = os.path.join(PROJECT_ROOT, "examples/eval/eval_suite/thesis_hairball_plot.png")
-    plt.savefig(out_path, dpi=300, bbox_inches="tight")
-    print(f"\n✅ Motivation Plot generated successfully: {out_path}")
-=======
-    for name, module in model.named_modules():
-        if "predict_action" in name or "action_head" in name:
-            module.register_forward_hook(hidden_state_hook)
-            break
-
-    return model, env, cfg
-
-def get_offline_trajectories(env, num_trajs=500):
+def extract_trajectories(env):
     dataset = env.get_dataset()
-    obs = dataset['observations']
-    actions = dataset['actions']
-    rewards = dataset['rewards']
-    costs = dataset.get('costs', dataset.get('item_costs', np.zeros_like(rewards)))
-    terminals = dataset['terminals']
-    timeouts = dataset.get('timeouts', np.zeros_like(terminals))
+    obs, acts, rews = dataset['observations'], dataset['actions'], dataset['rewards']
+    costs = dataset.get('costs', np.zeros_like(rews))
     
+    # 👈 FIX: Split into two separate lines
+    terms = dataset['terminals']
+    truncs = dataset.get('timeouts', np.zeros_like(terms))
+
     trajectories = []
-    current_traj = {'obs': [], 'acts': [], 'rews': [], 'costs': []}
+    curr = {'obs': [], 'acts': [], 'rews': [], 'costs': []}
     
     for i in range(len(obs)):
-        current_traj['obs'].append(obs[i])
-        current_traj['acts'].append(actions[i])
-        current_traj['rews'].append(rewards[i])
-        current_traj['costs'].append(costs[i])
-        
-        if terminals[i] or timeouts[i]:
-            if len(current_traj['obs']) > 20: 
-                trajectories.append({k: np.array(v) for k, v in current_traj.items()})
-            current_traj = {'obs': [], 'acts': [], 'rews': [], 'costs': []}
-            
-    return random.sample(trajectories, min(num_trajs, len(trajectories)))
+        curr['obs'].append(obs[i])
+        curr['acts'].append(acts[i])
+        curr['rews'].append(rews[i])
+        curr['costs'].append(costs[i])
 
-def extract_offline_embeddings(model, trajectories, cfg):
+        if terms[i] or truncs[i] or (i == len(obs) - 1):
+            r_arr, c_arr = np.array(curr['rews']), np.array(curr['costs'])
+            rtg, ctg = np.zeros_like(r_arr), np.zeros_like(c_arr)
+            rtg[-1], ctg[-1] = r_arr[-1], c_arr[-1]
+            for t in reversed(range(len(r_arr) - 1)):
+                rtg[t], ctg[t] = r_arr[t] + rtg[t+1], c_arr[t] + ctg[t+1]
+                
+            trajectories.append({
+                'obs': np.array(curr['obs']), 'acts': np.array(curr['acts']),
+                'rtg': rtg, 'ctg': ctg, 'ep_cost': np.sum(c_arr), 'length': len(r_arr)
+            })
+            curr = {'obs': [], 'acts': [], 'rews': [], 'costs': []}
+            
+    return trajectories
+
+def collect_continuous_embeddings(model, env, cfg, num_samples=1000):
     global hidden_states_buffer
-    hidden_states_buffer = []
-    trajectory_costs = []
+    hidden_states_buffer = []  
+    costs = []
+    
+    trajectories = extract_trajectories(env)
+    
+    # Just grab a massive random handful of the dataset
+    chosen_idx = np.random.choice(len(trajectories), size=min(num_samples, len(trajectories)), replace=False)
     seq_len = cfg["seq_len"]
-
-    for traj in trajectories:
-        t_len = len(traj['obs'])
-        if t_len <= seq_len:
-            continue
-            
-        step = random.randint(seq_len, t_len - 1)
-        trajectory_costs.append(np.sum(traj['costs']))
-
-        s_seq = torch.tensor(traj['obs'][step - seq_len : step], dtype=torch.float32, device=DEVICE).unsqueeze(0)
-        a_seq = torch.tensor(traj['acts'][step - seq_len : step], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+    
+    for idx in chosen_idx:
+        traj = trajectories[idx]
+        traj_len = traj['length']
         
-        rtg = np.sum(traj['rews'][step - seq_len :]) * cfg.get("reward_scale", 1.0)
-        ctg = np.sum(traj['costs'][step - seq_len :]) * cfg.get("cost_scale", 1.0)
+        t_end = np.random.randint(min(10, traj_len), traj_len) if traj_len > 10 else traj_len - 1
+        t_start = max(0, t_end - seq_len + 1)
         
-        r_seq = torch.full((1, seq_len), rtg, dtype=torch.float32, device=DEVICE)
-        c_seq = torch.full((1, seq_len), ctg, dtype=torch.float32, device=DEVICE)
-        t_seq = torch.arange(step - seq_len, step, dtype=torch.long, device=DEVICE).unsqueeze(0)
+        s_slice = traj['obs'][t_start : t_end + 1]
+        a_slice = traj['acts'][t_start : t_end + 1]
+        rtg_slice = traj['rtg'][t_start : t_end + 1] * cfg["reward_scale"]
+        ctg_slice = traj['ctg'][t_start : t_end + 1] * cfg["cost_scale"]
+        t_slice = np.arange(t_start, t_end + 1)
+        
+        actual_len = s_slice.shape[0]
+        
+        s_seq = torch.zeros((1, seq_len, s_slice.shape[1]), dtype=torch.float32, device=DEVICE)
+        a_seq = torch.zeros((1, seq_len, a_slice.shape[1]), dtype=torch.float32, device=DEVICE)
+        r_seq = torch.zeros((1, seq_len), dtype=torch.float32, device=DEVICE)
+        c_seq = torch.zeros((1, seq_len), dtype=torch.float32, device=DEVICE)
+        time_seq = torch.zeros((1, seq_len), dtype=torch.long, device=DEVICE)
+        
+        s_seq[0, -actual_len:] = torch.tensor(s_slice, device=DEVICE)
+        a_seq[0, -actual_len:] = torch.tensor(a_slice, device=DEVICE)
+        r_seq[0, -actual_len:] = torch.tensor(rtg_slice, device=DEVICE)
+        c_seq[0, -actual_len:] = torch.tensor(ctg_slice, device=DEVICE)
+        time_seq[0, -actual_len:] = torch.tensor(t_slice, device=DEVICE)
 
         with torch.no_grad():
-            if hasattr(model, "get_action"):
-                try:
-                    _ = model.get_action(s_seq, a_seq, r_seq, c_seq, t_seq)
-                except TypeError:
-                    _ = model.get_action(s_seq, a_seq, r_seq, c_seq)
-            else:
-                _ = model(s_seq, a_seq, r_seq, c_seq, t_seq)
-
+            if hasattr(model, "get_action"): _ = model.get_action(s_seq, a_seq, r_seq, c_seq, time_seq)
+            else: _ = model(s_seq, a_seq, r_seq, c_seq, time_seq)
+            
+        costs.append(traj['ep_cost'])
+                
     embeddings = np.concatenate(hidden_states_buffer, axis=0)
-    return embeddings, trajectory_costs
+    return embeddings, np.array(costs)
 
-def plot_gradient_manifold(df, env_name, model_type, out_directory):
-    plt.rcParams.update({
-        "font.family": "sans-serif",
-        "font.sans-serif": ["DejaVu Sans", "Helvetica", "Arial", "Roboto", "sans-serif"],
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.labelsize": 11,
-        "axes.titlesize": 13,
-        "axes.titleweight": "bold",
-    })
-
-    fig, ax = plt.subplots(figsize=(7, 5.5))
-    
-    scatter = ax.scatter(
-        df["x"], df["y"], 
-        c=df["Trajectory_Cost"], 
-        cmap="RdYlGn_r", 
-        s=85, alpha=0.9, edgecolors='w', linewidth=0.6
-    )
-
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label("Total Trajectory Cost", rotation=270, labelpad=20, fontweight="bold")
-    cbar.ax.tick_params(labelsize=9)
-
-    title_prefix = "CDT" if model_type == "vanilla" else "Contrastive CDT"
-    ax.set_title(f"{title_prefix} Latent Representation\n{env_name}", pad=15)
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-    plt.tight_layout()
-    os.makedirs(out_directory, exist_ok=True)
-    out_path = os.path.join(out_directory, f"{model_type}_gradient_{env_name.lower()}.png")
-    plt.savefig(out_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"✅ Plot saved: {out_path}")
-
-# --- CLI ENGINE ---
+# 4. EXECUTION
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate Latent Gradients for OSRL Models")
-    parser.add_argument("--models", nargs="+", choices=["vanilla", "ccdt", "both"], default=["both"], help="Models to evaluate")
-    parser.add_argument("--envs", nargs="+", default=["AntRun", "CarCircle", "DroneRun"], help="Environments to evaluate")
-    parser.add_argument("--trajectories", type=int, default=200, help="Number of offline trajectories to sample")
-    args = parser.parse_args()
+    print("🚀 Extracting True Offline Representations (Continuous Gradient)...")
+    
+    num_rows, num_cols = len(ROW_ORDER), len(ENV_ORDER)
+    plot_data = {env: {} for env in ENV_ORDER}
 
-    models_to_run = ["vanilla", "ccdt"] if "both" in args.models else args.models
-
-    print(f"🚀 Initializing Evaluation Pipeline on {DEVICE.upper()}")
-    print(f"🎯 Environments: {args.envs}")
-    print(f"🧠 Models: {models_to_run}")
-
-    for env_name in args.envs:
-        for m_type in models_to_run:
-            print(f"\n🌍 === PROCESSING: {env_name} | MODEL: {m_type.upper()} ===")
-            try:
-                config_path = resolve_config_path(env_name, m_type)
-                print(f"📂 Found Config: {config_path}")
-                
-                model, env, cfg = load_evaluation_model(config_path, m_type)
-                trajectories = get_offline_trajectories(env, num_trajs=args.trajectories)
-                
-                print(f"🧠 Extracting {len(trajectories)} representations...")
-                embeddings, costs = extract_offline_embeddings(model, trajectories, cfg)
-                
-                # print("🌌 Projecting to 2D via t-SNE...")
-                # tsne = TSNE(n_components=2, perplexity=30, random_state=42, init="pca", learning_rate="auto")
-                # embeddings_2d = tsne.fit_transform(embeddings)
-                print("🌌 Projecting to 2D via UMAP...")
-                reducer = umap.UMAP(
-                    n_neighbors=30,
-                    min_dist=0.1,
-                    metric='euclidean',
-                    random_state=42
-                )
-                embeddings_2d = reducer.fit_transform(embeddings)
-
-                df_plot = pd.DataFrame({"x": embeddings_2d[:, 0], "y": embeddings_2d[:, 1], "Trajectory_Cost": costs})
-
-                out_directory = os.path.join(PROJECT_ROOT, "examples/eval/eval_suite/plots/hairball_plots")
-                plot_gradient_manifold(df_plot, env_name, m_type, out_directory)
-                
-            except Exception as e:
-                print(f"❌ Error processing {env_name} with {m_type}: {str(e)}")
+    for col_idx, env_name in enumerate(ENV_ORDER):
+        for row_idx, arch_key in enumerate(ROW_ORDER):
+            config_path = EXPERIMENTS[env_name].get(arch_key)
+            if not config_path or not os.path.exists(os.path.join(PROJECT_ROOT, config_path)):
                 continue
->>>>>>> d96b01cddb096a77596bff80e170a1482c424f9d
+                
+            print(f"\n🧠 Processing {env_name} | {arch_key}...")
+            is_vanilla = (arch_key == "Baseline")
+            
+            model, env, cfg = load_and_hook_model(config_path, is_vanilla=is_vanilla)
+            embeddings, costs = collect_continuous_embeddings(model, env, cfg, num_samples=1000)
+            
+            print(f"🌌 Running t-SNE for {env_name} - {arch_key}...")
+            tsne = TSNE(n_components=2, perplexity=40, random_state=42)
+            emb_tsne = tsne.fit_transform(embeddings)
+            
+            plot_data[env_name][arch_key] = pd.DataFrame({"x": emb_tsne[:, 0], "y": emb_tsne[:, 1], "Cost": costs})
+
+    print("\n🎨 Rendering continuous gradient grid...")
+    sns.set_theme(style="white", font_scale=1.1)
+    plt.rcParams.update({"font.family": "serif"})
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows), sharex=False, sharey=False)
+
+    for col_idx, env_name in enumerate(ENV_ORDER):
+        for row_idx, arch_key in enumerate(ROW_ORDER):
+            ax = axes[row_idx, col_idx]
+            
+            if arch_key in plot_data[env_name]:
+                df = plot_data[env_name][arch_key]
+                # Matplotlib automatically scales 'c' from min to max within each subplot
+                ax.scatter(df["x"], df["y"], c=df["Cost"], cmap="RdYlGn_r", s=30, alpha=0.8, edgecolors='none')
+            else:
+                ax.text(0.5, 0.5, "Data Missing", ha='center', va='center', color='gray')
+                
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values(): 
+                spine.set_color("#bdc3c7")
+                
+            if row_idx == 0: 
+                ax.set_title(env_name, fontweight="bold", pad=15, fontsize=16)
+            if col_idx == 0: 
+                ax.set_ylabel(ROW_LABELS[row_idx], fontweight="bold", labelpad=15, fontsize=14)
+            if row_idx == num_rows - 1: 
+                ax.set_xlabel("t-SNE Dim 1", labelpad=10)
+
+    # --- BULLETPROOF COLORBAR ---
+    # Create a standalone color mapping decoupled from the subplots
+    plt.tight_layout()
+    sm = plt.cm.ScalarMappable(cmap="RdYlGn_r", norm=plt.Normalize(vmin=0, vmax=1))
+    sm.set_array([]) # Required for matplotlib
+
+    cbar_ax = fig.add_axes([0.25, 0.02, 0.5, 0.02]) # [left, bottom, width, height]
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    
+    # Set relative labels instead of raw numbers to account for different environments
+    cbar.set_ticks([0.0, 0.5, 1.0])
+    cbar.set_ticklabels(['Min Cost\n(Safe)', 'Medium Risk', 'Max Cost\n(Unsafe)'])
+    cbar.set_label("Relative Episodic Cost", fontweight='bold', fontsize=14, labelpad=10)
+
+    plt.subplots_adjust(bottom=0.15) # Give slightly more room for the new text
+    
+    out_path = os.path.join(PROJECT_ROOT, "examples/eval/eval_suite/tsne_continuous_grid.png")
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"\n✅ Continuous Grid Plot generated successfully: {out_path}")

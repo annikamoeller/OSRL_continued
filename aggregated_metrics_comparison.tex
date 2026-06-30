@@ -1,0 +1,19 @@
+\begin{tabular}{lccc}
+\toprule
+\multirow{2}{*}{\textbf{Architecture Variant}} & \multicolumn{3}{c}{\textbf{Environment (Norm. Reward | Norm. Cost)}} \\
+\cmidrule{2-4}
+Task & OfflineAntRun-v0 & OfflineCarCircle-v0 & OfflineDroneRun-v0 \\
+Display_Name &  &  &  \\
+\midrule
+Vanilla CDT (Baseline) & 70.6 $\pm$ 0.0  |  17.6 $\pm$ 0.0 & 77.9 $\pm$ 0.0  |  33.8 $\pm$ 0.0 & 63.2 $\pm$ 0.0  |  25.7 $\pm$ 0.0 \\
+Back Encoder | 2 Buckets | cw=0.1 & 69.9 $\pm$ 0.6  |  15.4 $\pm$ 1.3 & 77.3 $\pm$ 1.2  |  33.7 $\pm$ 1.9 & 64.6 $\pm$ 0.4  |  21.7 $\pm$ 2.3 \\
+Back Encoder | 2 Buckets | cw=0.3 & 70.6 $\pm$ 0.5  |  17.8 $\pm$ 2.2 & 77.6 $\pm$ 1.2  |  34.3 $\pm$ 3.4 & 64.0 $\pm$ 0.9  |  22.5 $\pm$ 1.1 \\
+Back Encoder | 2 Buckets | cw=0.5 & 69.7 $\pm$ 0.8  |  16.3 $\pm$ 2.1 & 78.1 $\pm$ 1.1  |  35.1 $\pm$ 1.5 & 62.9 $\pm$ 0.2  |  25.2 $\pm$ 2.5 \\
+Back Encoder | 3 Buckets | cw=0.1 & 70.5 $\pm$ 0.4  |  19.5 $\pm$ 1.3 & 77.7 $\pm$ 1.4  |  35.9 $\pm$ 3.7 & 63.0 $\pm$ 2.3  |  22.0 $\pm$ 5.4 \\
+Back Encoder | 3 Buckets | cw=0.3 & 71.0 $\pm$ 0.4  |  22.7 $\pm$ 3.5 & 76.7 $\pm$ 0.6  |  34.0 $\pm$ 0.7 & 62.5 $\pm$ 2.5  |  24.3 $\pm$ 2.2 \\
+Back Encoder | 3 Buckets | cw=0.5 & 71.0 $\pm$ 0.9  |  25.9 $\pm$ 2.0 & 75.7 $\pm$ 1.1  |  33.1 $\pm$ 1.9 & 53.1 $\pm$ 0.0  |  18.8 $\pm$ 0.0 \\
+Back Encoder | 5 Buckets | cw=0.1 & 71.0 $\pm$ 0.2  |  23.4 $\pm$ 2.0 & 77.6 $\pm$ 0.0  |  35.2 $\pm$ 0.0 & 62.8 $\pm$ 2.4  |  19.7 $\pm$ 6.1 \\
+Back Encoder | 5 Buckets | cw=0.3 & 69.9 $\pm$ 1.0  |  27.2 $\pm$ 1.2 & 76.5 $\pm$ 0.2  |  35.4 $\pm$ 1.0 & 58.2 $\pm$ 0.4  |  14.2 $\pm$ 0.2 \\
+Back Encoder | 5 Buckets | cw=0.5 & 70.9 $\pm$ 0.5  |  30.0 $\pm$ 3.2 & 76.1 $\pm$ 0.0  |  34.5 $\pm$ 0.0 & 54.6 $\pm$ 1.9  |  10.1 $\pm$ 3.4 \\
+\bottomrule
+\end{tabular}

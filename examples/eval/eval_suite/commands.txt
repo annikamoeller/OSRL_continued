@@ -2,3 +2,26 @@ plot the cost weight vs adherence:
 python3 examples/eval/eval_suite/plot_phase1_adherence.py --ccdt_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/ccdt_cost_20260619_1944/raw_data.csv --vanilla_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/vanilla_cost_sweep_20260623_1621/raw_data.csv --out_dir examples/eval/eval_suite/plots/phase1_plots
 
 plot the cost weight vs silhouette score:
+python examples/eval/eval_suite/plot_phase1_silhouette.py \
+  --sweep_dir /home/20234949/thesis/OSRL_continued/examples/eval/cluster_eval_sweeps/ \
+  --out_dir examples/eval/eval_suite/plots/phase1_plots/
+
+slice data for contrastive_weight 0.5
+python3 examples/eval/eval_suite/slice_csv.py \
+  --csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/ccdt_buckets_cost_sweep_20260629_1709/raw_data.csv \
+  --cw 0.3 \
+  --arch "Front" \
+  --out examples/eval/eval_suite/isolated_cw0.3_front
+
+plot noise robustness plot 
+python3 examples/eval/eval_suite/eval_suite.py plot_noise --run_dir /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/ccdt_distance_noise_robustness_20260624_1310 --vanilla_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/cdt_noise_robustness_20260623_1751/raw_data.csv
+
+eval noise for ccdt cw0.5 5 buckets
+python3 examples/eval/eval_suite/eval_suite.py eval_noise   --model_type ccdt_buckets   --log_filter "Back_*5Buckets_cw05*"
+
+eval lipschitz: 
+python3 examples/eval/eval_suite/eval_suite.py eval_lipschitz --model_type cdt --log_filter="*"
+
+plot_lipschitz:
+python3 examples/eval/eval_suite/eval_suite.py plot_lipschitz --run_dir /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/ccdt_threshold_lipschitz_smoothness_20260625_1602 --vanilla_csv /home/20234949/thesis/OSRL_continued/examples/eval/eval_suite/cdt_lipschitz_smoothness_20260626_1623/raw_data.csv
+

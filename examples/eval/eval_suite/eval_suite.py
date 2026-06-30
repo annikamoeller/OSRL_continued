@@ -51,14 +51,17 @@ ZERO_SHOT_COSTS = [15.0, 25.0, 35.0, 45.0, 55.0, 65.0, 75.0]  # Unseen interpola
 
 # Publication-Grade Visual Palette
 PALETTE = {
-    "Vanilla Baseline": "#E63946",  
+    "CDT Baseline": "#E63946",  
     "Front - Baseline": "#F4A261",  
     "Back - Baseline": "#2A9D8F",   
-    "Back - 2 Buckets": "#3A8D9D",  # Added for 2 Buckets
-    "Back - 3 Buckets": "#457B9D",  
-    "Back - 5 Buckets": "#1D3557",  
-    "Back - Threshold": "#9B5DE5",  # Added for future use
-    "Back - Distance": "#F15BB5",   # Added for future use
+    "Back-2B": "#3A8D9D",  # Added for 2 Buckets
+    "Back-3B": "#457B9D",  
+    "Back-5B": "#1D3557",  
+    "Front-2B": "#3A8D9D",  # Added for 2 Buckets
+    "Front-3B": "#457B9D",  
+    "Front-5B": "#1D3557",  
+    "Threshold": "#9B5DE5",  # Added for future use
+    "Distance": "#F15BB5",   # Added for future use
 }
 
 # =====================================================================
@@ -124,7 +127,7 @@ def load_model_and_env(config_path, model_type):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     max_action = env.action_space.high[0]
-
+    print(cfg["embedding_dim"])
     if model_type == "cdt":
         model = CDT(
             state_dim=state_dim, action_dim=action_dim, max_action=max_action,
@@ -365,6 +368,30 @@ def load_and_merge_data(run_dir, vanilla_csv=None):
         v_df = pd.read_csv(vanilla_csv)
         v_df["Variant"] = "CDT Baseline"
         df = pd.concat([df, v_df], ignore_index=True)
+        # --- DATA NORMALIZATION (Fixes inconsistent naming) ---
+        df = df.rename(columns={
+        "Raw_Eval_Cost": "Eval_Cost", 
+        "Raw_Eval_Reward": "Eval_Reward",
+        "Contrastive_Weight": "CW"
+        })
+        
+        cleanup_map = {
+            "Back - 2 Buckets": "Back-2B",
+            "Back - 3 Buckets": "Back-3B",
+            "Back - 5 Buckets": "Back-5B",
+            "Front - 2 Buckets": "Front-2B",
+            "Front - 3 Buckets": "Front-3B",
+            "Front - 5 Buckets": "Front-5B",
+            "Back - Distance Buckets": "Distance",
+            "Back - Threshold Buckets": "Threshold",
+            "Vanilla Baseline": "CDT Baseline",
+            "Vanilla": "CDT Baseline"
+        }
+        
+        # Check if the 'Variant' column exists, then apply the cleanup
+        if "Variant" in df.columns:
+            df["Variant"] = df["Variant"].replace(cleanup_map)
+            
         print("data loaded and merged")
     return df
 
@@ -426,20 +453,31 @@ def plot_noise_robustness(run_dir, vanilla_csv=None):
     df = load_and_merge_data(run_dir, vanilla_csv)
     tasks = sorted(df["Task"].unique())
     fig, axes = plt.subplots(1, len(tasks), figsize=(6 * len(tasks), 5))
-    if len(tasks) == 1: axes = [axes]
+    
+    # Handle single-task evaluation gracefully
+    if len(tasks) == 1: 
+        axes = [axes]
 
     for i, task in enumerate(tasks):
         sub = df[df["Task"] == task]
         for var in sub["Variant"].unique():
+            
+            # --- THE FIX: Aggregate any duplicate rows and strictly sort by X-axis ---
             v_df = sub[sub["Variant"] == var]
+            # Group by Noise_Scale and average everything else, then sort left-to-right
+            v_df = v_df.groupby("Noise_Scale", as_index=False).mean(numeric_only=True)
+            v_df = v_df.sort_values("Noise_Scale")
+            
             axes[i].plot(v_df["Noise_Scale"], v_df["Avg_Cost"], marker="o", linewidth=2.5, label=var, color=PALETTE.get(var, "#000"))
             axes[i].fill_between(v_df["Noise_Scale"], v_df["Avg_Cost"] - v_df["Std_Cost"], v_df["Avg_Cost"] + v_df["Std_Cost"], alpha=0.15, color=PALETTE.get(var, "#000"))
 
+        # Formatting
         axes[i].axhline(10.0, color="r", linestyle="--", alpha=0.8, label="Safety Limit" if i==0 else "")
         axes[i].set_title(f"Noise Robustness: {task}", fontweight="bold")
         axes[i].set_xlabel("State Noise (Gaussian Std Dev)")
         axes[i].set_ylabel("Average Trajectory Cost" if i == 0 else "")
-        if i == len(tasks)-1: axes[i].legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+        if i == len(tasks)-1: 
+            axes[i].legend(bbox_to_anchor=(1.05, 1), loc="upper left")
 
     plt.tight_layout()
     plt.savefig(os.path.join(run_dir, "plot_noise_robustness.png"), dpi=300, bbox_inches="tight")
@@ -456,6 +494,11 @@ def plot_lipschitz_continuity(run_dir, vanilla_csv=None):
         sub = df[df["Task"] == task]
         for var in sub["Variant"].unique():
             v_df = sub[sub["Variant"] == var]
+            
+            # --- THE FIX: Aggregate the seeds so Matplotlib draws one clean line ---
+            v_df = v_df.groupby("Epsilon", as_index=False).mean(numeric_only=True)
+            v_df = v_df.sort_values("Epsilon")
+
             axes[i].plot(v_df["Epsilon"], v_df["Avg_Lipschitz"], marker="o", linewidth=2.5, label=var, color=PALETTE.get(var, "#000"))
             axes[i].fill_between(v_df["Epsilon"], v_df["Avg_Lipschitz"] - v_df["Std_Lipschitz"]*0.2, v_df["Avg_Lipschitz"] + v_df["Std_Lipschitz"]*0.2, alpha=0.15, color=PALETTE.get(var, "#000"))
 

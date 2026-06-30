@@ -7,17 +7,15 @@ ARCHS=("front" "back")
 
 # Define the environments you want to test
 ENVS=(
-    "OfflineAntRun-v0" 
-    "OfflineCarCircle-v0" 
-    "OfflineDroneCircle-v0" 
+    # "OfflineAntRun-v0" 
+    # "OfflineCarCircle-v0" 
+    "OfflineDroneRun-v0" 
 )
-
-
 
 # Define the hyperparameters to sweep
 BUCKETS=(2 3 5)
-SEEDS=(8 42 123)
-WEIGHTS=(0.1 0.3 0.5) 
+SEEDS=(8 42)
+WEIGHTS=(0.1 0.3) 
 
 mkdir -p slurm_logs
 

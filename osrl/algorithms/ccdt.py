@@ -103,6 +103,92 @@ class BaseContrastiveCDT(CDT):
 
         return action_preds, cost_preds, state_preds
 
+class ContrastiveCDTFrontNew(BaseContrastiveCDT):
+    def __init__(self, contrastive_dim=64, num_buckets=3, **kwargs):
+        super().__init__(**kwargs)
+        self.contrastive_dim = contrastive_dim
+        self.num_buckets = num_buckets
+
+        # 1. BUCKET TRANSFORMERS
+        # A separate transformation matrix for each discrete cost bucket.
+        # This is the exact mechanism ConDT uses to separate the modalities early.
+        self.bucket_transforms = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(2 * self.embedding_dim, 2 * self.embedding_dim),
+                nn.LayerNorm(2 * self.embedding_dim),
+                nn.LeakyReLU(inplace=True)
+            ) for _ in range(self.num_buckets)
+        ])
+
+        # 2. Project transformed embeddings into the contrastive space
+        self.compress = nn.Sequential(
+            nn.Linear(2 * self.embedding_dim, self.contrastive_dim), 
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(
+        self,
+        states,
+        actions,
+        returns_to_go,
+        costs_to_go,
+        time_steps,
+        bucket_labels=None,  # 👈 NEW: We must pass the discrete bucket IDs
+        padding_mask=None,
+        episode_cost=None,
+        return_latents=False,
+    ):
+        batch_size, seq_len = states.shape[0], states.shape[1]
+
+        # 1. Get raw embeddings from your base class
+        # raw_embs usually contains [s_emb, a_emb, r_emb, c_emb]
+        seq_list, raw_embs, time_embs = self._prepare_embeddings(
+            states, actions, returns_to_go, costs_to_go, time_steps
+        )
+
+        s_emb = raw_embs[0]
+        a_emb = raw_embs[1]
+        
+        # Combine state and action for the joint contrastive space
+        combined_emb = torch.cat([s_emb, a_emb], dim=-1)
+        transformed_emb = torch.zeros_like(combined_emb)
+
+        # 2. CONDITIONAL ROUTING
+        # Apply the specific transformation matrix based on the trajectory's bucket
+        if bucket_labels is not None:
+            for b_idx in range(self.num_buckets):
+                mask = (bucket_labels == b_idx)
+                if mask.any():
+                    # Transform only the trajectories belonging to this bucket
+                    transformed_emb[mask] = self.bucket_transforms[b_idx](combined_emb[mask])
+        else:
+            # Fallback during purely standard inference if no bucket is provided
+            transformed_emb = combined_emb 
+
+        # 3. GET LATENTS FOR SIMRCRL LOSS
+        latents = None
+        if return_latents:
+            latents = self.compress(transformed_emb)
+
+        # 4. SEQUENCE RE-INJECTION
+        # Split the transformed joint embedding back into state and action
+        new_s_emb, new_a_emb = torch.split(transformed_emb, self.embedding_dim, dim=-1)
+        
+        # We must overwrite the old raw embeddings in the seq_list so the causal
+        # transformer actually processes our new, cleanly separated bucket geometries!
+        # (Assuming your seq_list is ordered like: [r_emb, c_emb, s_emb, a_emb])
+        # Update these indices depending on how _prepare_embeddings builds the list.
+        seq_list[self.seq_repeat - 2] = new_s_emb + time_embs[0] # State
+        seq_list[self.seq_repeat - 1] = new_a_emb + time_embs[1] # Action
+
+        # 5. Process through the Causal Transformer
+        transformer_out = self._process_transformer(seq_list, padding_mask, episode_cost, batch_size, seq_len)
+        action_preds, cost_preds, state_preds = self._generate_predictions(transformer_out, time_embs[3])
+
+        if return_latents:
+            return action_preds, cost_preds, state_preds, latents
+        return action_preds, cost_preds, state_preds
+    
 
 class ContrastiveCDTFront(BaseContrastiveCDT):
     def __init__(self, contrastive_dim=64, **kwargs):
@@ -127,7 +213,7 @@ class ContrastiveCDTFront(BaseContrastiveCDT):
         self.compress = nn.Sequential(nn.Linear(2 * self.embedding_dim, self.contrastive_dim), nn.ReLU(inplace=True))
 
         # Project raw embeddings into contrastive dimension
-        self.compress = nn.Sequential(nn.Linear(4 * self.embedding_dim, self.contrastive_dim), nn.ReLU(inplace=True))
+        # self.compress = nn.Sequential(nn.Linear(4 * self.embedding_dim, self.contrastive_dim), nn.ReLU(inplace=True))
 
     def forward(
         self,

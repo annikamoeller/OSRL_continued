@@ -1,4 +1,4 @@
-Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+Task,Seed,Architecture,Buckets,CW,Variant,Target_Cost,Target_Reward,Eval_Cost,Eval_Reward,Avg_Episode_Length
 AntRun,42,Back,2,0.1,Back-2B,0.0,238.8699951171875,83.9,730.5221410480635,200.0
 AntRun,42,Back,2,0.1,Back-2B,10.0,238.8699951171875,92.5,754.2280517305666,200.0
 AntRun,42,Back,2,0.1,Back-2B,20.0,238.8699951171875,97.85,758.0541292291505,200.0

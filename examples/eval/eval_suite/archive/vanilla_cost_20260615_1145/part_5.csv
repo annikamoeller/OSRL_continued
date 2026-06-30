@@ -1,10 +1,10 @@
-Task,Seed,Architecture,Buckets,Contrastive_Weight,Variant,Target_Cost,Target_Reward,Raw_Eval_Cost,Raw_Eval_Reward,Avg_Episode_Length
+Task,Seed,Architecture,Buckets,CW,Variant,Target_Cost,Target_Reward,Eval_Cost,Eval_Reward,Avg_Episode_Length
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,0.0,682.8300170898438,1.55,381.9200980472144,200.0
-DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,682.8300170898438,0.0,388.80970882959974,200.0
+DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,10.0,682.8300170898438,0.0,388.8097088295997,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,20.0,682.8300170898438,0.0,391.8920778030159,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,30.0,682.8300170898438,0.0,389.97235934383167,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,40.0,682.8300170898438,0.0,393.9306521349108,200.0
-DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,50.0,682.8300170898438,39.25,420.07121580847013,200.0
+DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,50.0,682.8300170898438,39.25,420.0712158084701,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,60.0,682.8300170898438,37.75,369.27106628032834,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,70.0,682.8300170898438,44.95,385.3440084004724,200.0
 DroneRun,8,Vanilla,Baseline,0.0,Vanilla Baseline,80.0,682.8300170898438,43.0,382.0634012741864,200.0
